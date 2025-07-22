@@ -20,11 +20,29 @@ const Login = ({ onLogin }) => {
         <h2>Iniciar Sesión</h2>
         <div className="form-field">
           <label htmlFor="email">Email</label>
-          <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <div className="input-icon">
+            <i className="fas fa-envelope"></i>
+            <input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
         </div>
         <div className="form-field">
           <label htmlFor="password">Contraseña</label>
-          <input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+          <div className="input-icon">
+            <i className="fas fa-lock"></i>
+            <input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
         </div>
         {error && <p role="alert">{error}</p>}
         <div className="form-actions">
