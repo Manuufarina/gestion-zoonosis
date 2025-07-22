@@ -1,428 +1,85 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from './firebase';
 
-// --- CONFIGURACIÓN E INICIALIZACIÓN DE FIREBASE ---
-// Se integra directamente para evitar errores de importación.
-import { initializeApp } from 'firebase/app';
-import { getAuth, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query } from 'firebase/firestore';
+import Sidebar from './components/Sidebar';
+import Dashboard from './components/Dashboard';
+import VecinosList from './components/VecinosList';
+import VecinoForm from './components/VecinoForm';
+import VecinoDetail from './components/VecinoDetail';
+import MascotaForm from './components/MascotaForm';
 
-// ▼▼▼ ATENCIÓN: PEGA AQUÍ TU CONFIGURACIÓN DE FIREBASE (del Paso 5) ▼▼▼
-const firebaseConfig = {
-  apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
-  authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.REACT_APP_FIREBASE_APP_ID
-};
-// ▲▲▲ FIN DE LA CONFIGURACIÓN DE FIREBASE ▲▲▲
-
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-
-
-// --- COMPONENTES AUXILIARES ---
-
-const Modal = ({ show, onClose, onConfirm, title, children }) => {
-    if (!show) {
-        return null;
-    }
-    return (
-        <div className="modal-backdrop">
-            <div className="modal-content">
-                <h3 className="modal-title">{title}</h3>
-                <div className="modal-body">
-                    {children}
-                </div>
-                <div className="modal-actions">
-                    <button className="button button-secondary" onClick={onClose}>Cancelar</button>
-                    <button className="button button-danger" onClick={onConfirm}>Confirmar</button>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-
-// --- COMPONENTES PRINCIPALES DE LA UI ---
-
-const Sidebar = ({ onSelect, activeSection, user }) => {
-    const isAdmin = user && user.rol === 'Admin';
-    return (
-        <aside className="sidebar">
-            <div className="sidebar-header">
-                <h1>Zoonosis</h1>
-                <p>San Isidro</p>
-            </div>
-            <nav className="sidebar-nav">
-                <SidebarLink icon="fa-tachometer-alt" text="Dashboard" section="dashboard" activeSection={activeSection} onSelect={onSelect} />
-                <SidebarLink icon="fa-users" text="Vecinos y Mascotas" section="vecinosList" activeSection={activeSection} onSelect={onSelect} />
-                <SidebarLink icon="fa-boxes-stacked" text="Gestión de Stock" section="stock" activeSection={activeSection} onSelect={onSelect} />
-                <SidebarLink icon="fa-chart-pie" text="Reportes" section="reportes" activeSection={activeSection} onSelect={onSelect} />
-                {isAdmin && (
-                    <div className="sidebar-section-divider">
-                        <p className="sidebar-section-title">Administración</p>
-                        <SidebarLink icon="fa-user-shield" text="Gestión de Usuarios" section="usuarios" activeSection={activeSection} onSelect={onSelect} />
-                    </div>
-                )}
-            </nav>
-            <div className="sidebar-footer">
-                {user && (
-                    <div className="user-profile">
-                        <img src={`https://placehold.co/40x40/a7f3d0/14532d?text=${user.nombre ? user.nombre.charAt(0) : 'U'}`} alt="Avatar" />
-                        <div className="user-info">
-                            <p className="user-name">{user.nombre || 'Usuario'}</p>
-                            <p className="user-role">{user.rol || 'Rol'}</p>
-                            <a href="#">Cerrar Sesión</a>
-                        </div>
-                    </div>
-                )}
-            </div>
-        </aside>
-    );
-};
-
-const SidebarLink = ({ icon, text, section, activeSection, onSelect }) => {
-    const isActive = activeSection.split('-')[0] === section.split('-')[0];
-    return (
-        <a href="#" className={`sidebar-link ${isActive ? 'active' : ''}`} onClick={() => onSelect(section)}>
-            <i className={`fas ${icon}`}></i>
-            <span>{text}</span>
-        </a>
-    );
-};
-
-// --- COMPONENTES DE SECCIONES ---
-
-const Dashboard = () => (
-    <section>
-        <h2 className="section-title">Dashboard</h2>
-        <div className="card">
-            <p>Bienvenido al sistema de gestión de Zoonosis. Seleccione una opción del menú para comenzar.</p>
-        </div>
-    </section>
-);
-
-const VecinosList = ({ onSelectVecino, onShowForm }) => {
-    const [vecinos, setVecinos] = useState([]);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        const q = query(collection(db, "vecinos"));
-        const unsubscribe = onSnapshot(q, (querySnapshot) => {
-            const vecinosData = [];
-            querySnapshot.forEach((doc) => {
-                vecinosData.push({ id: doc.id, ...doc.data() });
-            });
-            setVecinos(vecinosData);
-            setLoading(false);
-        }, (error) => {
-            console.error("Error al obtener vecinos: ", error);
-            setLoading(false);
-        });
-        return () => unsubscribe();
-    }, []);
-
-    if (loading) {
-        return <div className="card">Cargando vecinos...</div>;
-    }
-
-    return (
-        <section>
-            <div className="header-actions">
-                <h2 className="section-title" style={{ marginBottom: 0 }}>Vecinos y Mascotas</h2>
-                <button className="button button-primary" onClick={() => onShowForm('vecinoForm', { mode: 'new' })}>
-                    <i className="fas fa-plus"></i> Nuevo Vecino
-                </button>
-            </div>
-            <div className="card">
-                <table className="table">
-                    <thead>
-                        <tr><th>Nombre y Apellido</th><th>DNI</th><th>Email</th><th style={{ textAlign: 'center' }}>Acciones</th></tr>
-                    </thead>
-                    <tbody>
-                        {vecinos.length > 0 ? vecinos.map(vecino => (
-                            <tr key={vecino.id}>
-                                <td>{vecino.nombre} {vecino.apellido}</td>
-                                <td>{vecino.dni}</td>
-                                <td>{vecino.email}</td>
-                                <td style={{ textAlign: 'center' }}>
-                                    <button className="button-link" onClick={() => onSelectVecino(vecino)}>
-                                        <i className="fas fa-eye"></i> Ver Ficha
-                                    </button>
-                                </td>
-                            </tr>
-                        )) : (
-                            <tr><td colSpan="4">No hay vecinos registrados.</td></tr>
-                        )}
-                    </tbody>
-                </table>
-            </div>
-        </section>
-    );
-};
-
-const VecinoForm = ({ onBack, currentVecino }) => {
-    const isEditMode = !!currentVecino;
-    const [formData, setFormData] = useState({
-        nombre: '', apellido: '', dni: '', telefono: '', domicilio: '', email: ''
-    });
-
-    useEffect(() => {
-        if (isEditMode) {
-            setFormData(currentVecino);
-        }
-    }, [currentVecino, isEditMode]);
-
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
-    };
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        try {
-            if (isEditMode) {
-                const docRef = doc(db, 'vecinos', currentVecino.id);
-                await updateDoc(docRef, formData);
-            } else {
-                await addDoc(collection(db, 'vecinos'), formData);
-            }
-            onBack();
-        } catch (error) {
-            console.error("Error al guardar vecino: ", error);
-        }
-    };
-
-    return (
-        <section>
-            <h2 className="section-title">{isEditMode ? 'Editar' : 'Registrar'} Vecino</h2>
-            <div className="card form-container">
-                <form onSubmit={handleSubmit}>
-                    <div className="form-grid">
-                        <div className="form-field"><label>Nombre</label><input name="nombre" value={formData.nombre} onChange={handleChange} required /></div>
-                        <div className="form-field"><label>Apellido</label><input name="apellido" value={formData.apellido} onChange={handleChange} required /></div>
-                        <div className="form-field"><label>DNI</label><input name="dni" value={formData.dni} onChange={handleChange} required /></div>
-                        <div className="form-field"><label>Teléfono</label><input name="telefono" value={formData.telefono} onChange={handleChange} /></div>
-                        <div className="form-field full-width"><label>Domicilio</label><input name="domicilio" value={formData.domicilio} onChange={handleChange} required /></div>
-                        <div className="form-field full-width"><label>Email</label><input type="email" name="email" value={formData.email} onChange={handleChange} required /></div>
-                    </div>
-                    <div className="form-actions">
-                        <button type="button" className="button button-secondary" onClick={onBack}>Cancelar</button>
-                        <button type="submit" className="button button-primary">Guardar Vecino</button>
-                    </div>
-                </form>
-            </div>
-        </section>
-    );
-};
-
-const VecinoDetail = ({ vecino, onEditVecino, onShowForm, onDeleteVecino }) => {
-    const [mascotas, setMascotas] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [showDeleteModal, setShowDeleteModal] = useState(false);
-
-    useEffect(() => {
-        if (!vecino) return;
-        const q = query(collection(db, `vecinos/${vecino.id}/mascotas`));
-        const unsubscribe = onSnapshot(q, (querySnapshot) => {
-            const mascotasData = [];
-            querySnapshot.forEach((doc) => {
-                mascotasData.push({ id: doc.id, ...doc.data() });
-            });
-            setMascotas(mascotasData);
-            setLoading(false);
-        }, (error) => {
-            console.error("Error al obtener mascotas: ", error);
-            setLoading(false);
-        });
-        return () => unsubscribe();
-    }, [vecino]);
-
-    const handleDelete = async () => {
-        try {
-            await deleteDoc(doc(db, 'vecinos', vecino.id));
-            onDeleteVecino(); // Esta función debería volver a la lista de vecinos
-        } catch (error) {
-            console.error("Error al eliminar vecino:", error);
-        }
-        setShowDeleteModal(false);
-    }
-
-    return (
-        <section>
-            <div className="header-actions">
-                <h2 className="section-title" style={{ marginBottom: 0 }}>Ficha del Vecino</h2>
-                <div>
-                    <button className="button button-danger" onClick={() => setShowDeleteModal(true)}><i className="fas fa-trash-alt"></i> Eliminar Vecino</button>
-                </div>
-            </div>
-            <div className="card mb-6">
-                <div className="vecino-detail-grid">
-                    <div><strong>Nombre:</strong> {vecino.nombre} {vecino.apellido}</div>
-                    <div><strong>DNI:</strong> {vecino.dni}</div>
-                    <div><strong>Teléfono:</strong> {vecino.telefono}</div>
-                    <div><strong>Email:</strong> {vecino.email}</div>
-                    <div className="full-width"><strong>Domicilio:</strong> {vecino.domicilio}</div>
-                </div>
-                <div className="form-actions" style={{justifyContent: 'flex-start', marginTop: '1rem'}}>
-                    <button className="button button-secondary" onClick={() => onEditVecino(vecino)}><i className="fas fa-edit"></i> Editar Datos</button>
-                </div>
-            </div>
-
-            <div className="header-actions">
-                <h3 className="section-subtitle">Mascotas Registradas</h3>
-                <button className="button button-primary" onClick={() => onShowForm('mascotaForm', { mode: 'new', vecinoId: vecino.id })}>
-                    <i className="fas fa-plus"></i> Nueva Mascota
-                </button>
-            </div>
-            <div className="card">
-                 <table className="table">
-                    <thead>
-                        <tr><th>Nombre</th><th>Especie</th><th>Raza</th><th style={{ textAlign: 'center' }}>Acciones</th></tr>
-                    </thead>
-                    <tbody>
-                        {loading ? (
-                            <tr><td colSpan="4">Cargando mascotas...</td></tr>
-                        ) : mascotas.length > 0 ? mascotas.map(mascota => (
-                            <tr key={mascota.id}>
-                                <td>{mascota.nombre}</td>
-                                <td>{mascota.especie}</td>
-                                <td>{mascota.raza}</td>
-                                <td style={{ textAlign: 'center' }}>
-                                    <button className="button-link"><i className="fas fa-file-medical"></i> Ver Historial</button>
-                                </td>
-                            </tr>
-                        )) : (
-                            <tr><td colSpan="4">Este vecino no tiene mascotas registradas.</td></tr>
-                        )}
-                    </tbody>
-                </table>
-            </div>
-            <Modal
-                show={showDeleteModal}
-                onClose={() => setShowDeleteModal(false)}
-                onConfirm={handleDelete}
-                title="Confirmar Eliminación"
-            >
-                <p>¿Estás seguro de que deseas eliminar a <strong>{vecino.nombre} {vecino.apellido}</strong>? Esta acción no se puede deshacer y eliminará también a todas sus mascotas.</p>
-            </Modal>
-        </section>
-    );
-};
-
-const MascotaForm = ({ onBack, currentMascota, vecinoId }) => {
-    const isEditMode = !!currentMascota;
-    const [formData, setFormData] = useState({
-        nombre: '', especie: 'Perro', raza: '', sexo: 'Macho', fechaNac: '', color: '', señas: ''
-    });
-
-    useEffect(() => {
-        if (isEditMode) {
-            setFormData(currentMascota);
-        }
-    }, [currentMascota, isEditMode]);
-
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
-    };
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        try {
-            const collectionPath = `vecinos/${vecinoId}/mascotas`;
-            if (isEditMode) {
-                const docRef = doc(db, collectionPath, currentMascota.id);
-                await updateDoc(docRef, formData);
-            } else {
-                await addDoc(collection(db, collectionPath), formData);
-            }
-            onBack();
-        } catch (error) {
-            console.error("Error al guardar mascota: ", error);
-        }
-    };
-
-    return (
-        <section>
-            <h2 className="section-title">{isEditMode ? 'Editar' : 'Registrar'} Mascota</h2>
-            <div className="card form-container">
-                <form onSubmit={handleSubmit}>
-                    <div className="form-grid">
-                        <div className="form-field"><label>Nombre</label><input name="nombre" value={formData.nombre} onChange={handleChange} required /></div>
-                        <div className="form-field"><label>Especie</label><select name="especie" value={formData.especie} onChange={handleChange}><option>Perro</option><option>Gato</option></select></div>
-                        <div className="form-field"><label>Raza</label><input name="raza" value={formData.raza} onChange={handleChange} /></div>
-                        <div className="form-field"><label>Sexo</label><select name="sexo" value={formData.sexo} onChange={handleChange}><option>Macho</option><option>Hembra</option></select></div>
-                        <div className="form-field"><label>Fecha Nac. (Aprox)</label><input type="date" name="fechaNac" value={formData.fechaNac} onChange={handleChange} /></div>
-                        <div className="form-field"><label>Color</label><input name="color" value={formData.color} onChange={handleChange} /></div>
-                        <div className="form-field full-width"><label>Señas Particulares</label><textarea name="señas" value={formData.señas} onChange={handleChange} rows="3"></textarea></div>
-                    </div>
-                    <div className="form-actions">
-                        <button type="button" className="button button-secondary" onClick={onBack}>Cancelar</button>
-                        <button type="submit" className="button button-primary">Guardar Mascota</button>
-                    </div>
-                </form>
-            </div>
-        </section>
-    );
-};
-
-// --- COMPONENTE PRINCIPAL DE LA APLICACIÓN ---
 const App = () => {
-    const [user, setUser] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [activeSection, setActiveSection] = useState('dashboard');
-    const [selectedVecino, setSelectedVecino] = useState(null);
-    const [formState, setFormState] = useState({ mode: 'new', data: null });
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [activeSection, setActiveSection] = useState('dashboard');
+  const [selectedVecino, setSelectedVecino] = useState(null);
+  const [formState, setFormState] = useState({ mode: 'new', data: null, vecinoId: null });
 
-    useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-            if (firebaseUser) {
-                // En un futuro, aquí se buscaría el perfil del usuario en Firestore
-                setUser({ uid: firebaseUser.uid, nombre: 'Admin', rol: 'Admin' });
-            } else {
-                setUser(null);
-            }
-            setLoading(false);
-        });
-        return () => unsubscribe();
-    }, []);
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        setUser({ uid: firebaseUser.uid, nombre: 'Admin', rol: 'Admin' });
+      } else {
+        setUser(null);
+      }
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
 
-    const handleShowForm = (section, state = { mode: 'new', data: null }) => {
-        setFormState(state);
-        setActiveSection(section);
-    };
+  const handleShowForm = (section, state = { mode: 'new', data: null }) => {
+    setFormState(state);
+    setActiveSection(section);
+  };
 
-    const handleSelectVecino = (vecino) => {
-        setSelectedVecino(vecino);
-        setActiveSection('vecinoDetail');
-    };
-    
-    const handleBackToVecinos = () => {
-        setSelectedVecino(null);
-        setActiveSection('vecinosList');
+  const handleSelectVecino = (vecino) => {
+    setSelectedVecino(vecino);
+    setActiveSection('vecinoDetail');
+  };
+
+  const handleBackToVecinos = () => {
+    setSelectedVecino(null);
+    setActiveSection('vecinosList');
+  };
+
+  if (loading) {
+    return <div className="loading-screen">Cargando aplicación...</div>;
+  }
+
+  const renderContent = () => {
+    switch (activeSection) {
+      case 'dashboard':
+        return <Dashboard />;
+      case 'vecinosList':
+        return <VecinosList onSelectVecino={handleSelectVecino} onShowForm={handleShowForm} />;
+      case 'vecinoForm':
+        return <VecinoForm onBack={handleBackToVecinos} currentVecino={formState.mode === 'edit' ? formState.data : null} />;
+      case 'vecinoDetail':
+        return (
+          <VecinoDetail
+            vecino={selectedVecino}
+            onEditVecino={(v) => handleShowForm('vecinoForm', { mode: 'edit', data: v })}
+            onShowForm={handleShowForm}
+            onDeleteVecino={handleBackToVecinos}
+          />
+        );
+      case 'mascotaForm':
+        return (
+          <MascotaForm
+            onBack={() => setActiveSection('vecinoDetail')}
+            vecinoId={formState.vecinoId}
+            currentMascota={formState.mode === 'edit' ? formState.data : null}
+          />
+        );
+      default:
+        return <Dashboard />;
     }
+  };
 
-    if (loading) {
-        return <div className="loading-screen">Cargando aplicación...</div>;
-    }
-
-    const renderContent = () => {
-        switch (activeSection) {
-            case 'dashboard': return <Dashboard />;
-            case 'vecinosList': return <VecinosList onSelectVecino={handleSelectVecino} onShowForm={handleShowForm} />;
-            case 'vecinoForm': return <VecinoForm onBack={handleBackToVecinos} currentVecino={formState.mode === 'edit' ? formState.data : null} />;
-            case 'vecinoDetail': return <VecinoDetail vecino={selectedVecino} onEditVecino={(v) => handleShowForm('vecinoForm', { mode: 'edit', data: v })} onShowForm={handleShowForm} onDeleteVecino={handleBackToVecinos} />;
-            case 'mascotaForm': return <MascotaForm onBack={() => setActiveSection('vecinoDetail')} vecinoId={formState.vecinoId} currentMascota={formState.mode === 'edit' ? formState.data : null} />;
-            default: return <Dashboard />;
-        }
-    };
-
-    return (
-        <>
-            <style>{`
+  return (
+    <>
+      <style>{`
                 /* Estilos Generales */
                 body { font-family: 'Inter', sans-serif; margin: 0; background-color: #f1f5f9; color: #334155; }
                 .app-container { display: flex; height: 100vh; background-color: #f1f5f9; }
@@ -488,14 +145,12 @@ const App = () => {
                 .modal-actions { margin-top: 2rem; display: flex; justify-content: flex-end; gap: 1rem; }
                 .loading-screen { display: flex; justify-content: center; align-items: center; height: 100vh; font-size: 1.25rem; color: #14532d; }
             `}</style>
-            <div className="app-container">
-                <Sidebar onSelect={setActiveSection} activeSection={activeSection} user={user} />
-                <main className="main-content">
-                    {renderContent()}
-                </main>
-            </div>
-        </>
-    );
+      <div className="app-container">
+        <Sidebar onSelect={setActiveSection} activeSection={activeSection} user={user} />
+        <main className="main-content">{renderContent()}</main>
+      </div>
+    </>
+  );
 };
 
 export default App;
