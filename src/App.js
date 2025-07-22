@@ -2,24 +2,9 @@ import React, { useState, useEffect } from 'react';
 
 // --- CONFIGURACIÓN E INICIALIZACIÓN DE FIREBASE ---
 // Se integra directamente para evitar errores de importación.
-import { initializeApp } from 'firebase/app';
-import { getAuth, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, Timestamp } from 'firebase/firestore';
-
-// ▼▼▼ ATENCIÓN: PEGA AQUÍ TU CONFIGURACIÓN DE FIREBASE (del Paso 5) ▼▼▼
-const firebaseConfig = {
-  apiKey: "TU_API_KEY",
-  authDomain: "TU_AUTH_DOMAIN",
-  projectId: "TU_PROJECT_ID",
-  storageBucket: "TU_STORAGE_BUCKET",
-  messagingSenderId: "TU_MESSAGING_SENDER_ID",
-  appId: "TU_APP_ID"
-};
-// ▲▲▲ FIN DE LA CONFIGURACIÓN DE FIREBASE ▲▲▲
-
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
+import { onAuthStateChanged } from 'firebase/auth';
+import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, Timestamp } from 'firebase/firestore';
+import { auth, db } from './firebase';
 
 
 // --- COMPONENTES AUXILIARES ---
