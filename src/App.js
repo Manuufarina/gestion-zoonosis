@@ -122,6 +122,7 @@ const VecinoForm = ({ onBack, currentVecino }) => {
                 const docRef = await addDoc(collection(db, 'vecinos'), formData);
                 logUserAction(auth.currentUser?.uid, 'crear vecino', { id: docRef.id });
             }
+            alert('Vecino guardado con éxito');
             onBack();
         } catch (error) { console.error("Error al guardar vecino: ", error); }
     };
@@ -169,6 +170,7 @@ const VecinoDetail = ({ vecino, onEditVecino, onShowForm, onDeleteVecino, onSele
         try {
             await deleteDoc(doc(db, 'vecinos', vecino.id));
             logUserAction(auth.currentUser?.uid, 'eliminar vecino', { id: vecino.id });
+            alert('Vecino eliminado con éxito');
             onDeleteVecino();
         } catch (error) { console.error("Error al eliminar vecino:", error); }
         setShowDeleteModal(false);
@@ -241,6 +243,7 @@ const MascotaForm = ({ onBack, currentMascota, vecinoId }) => {
                 const docRef = await addDoc(collection(db, collectionPath), formData);
                 logUserAction(auth.currentUser?.uid, 'crear mascota', { id: docRef.id });
             }
+            alert('Mascota guardada con éxito');
             onBack();
         } catch (error) { console.error("Error al guardar mascota: ", error); }
     };
@@ -480,6 +483,7 @@ const InsumoForm = ({ onBack }) => {
             };
             const docRef = await addDoc(collection(db, 'insumos'), data);
             logUserAction(auth.currentUser?.uid, 'crear insumo', { id: docRef.id });
+            alert('Insumo guardado con éxito');
             onBack();
         } catch (err) {
             console.error('Error creando insumo', err);
