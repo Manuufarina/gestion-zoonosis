@@ -1,10 +1,16 @@
-# Getting Started with Create React App
+# Gestión Zoonosis
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Aplicación web creada con [Create React App](https://github.com/facebook/create-react-app).
+
+## Puesta en marcha
+
+1. Instale las dependencias con `npm install`.
+2. Configure las credenciales de Firebase editando `src/firebase.js`.
+3. Ejecute `npm start` para iniciar la versión de desarrollo.
 
 ## Available Scripts
 
-In the project directory, you can run:
+Dentro del directorio del proyecto se puede ejecutar:
 
 ### `npm start`
 
