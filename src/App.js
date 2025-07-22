@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import Sidebar from './components/Sidebar';
+import Login from './components/Login';
 
 // --- CONFIGURACIÓN E INICIALIZACIÓN DE FIREBASE ---
 // Se integra directamente para evitar errores de importación.
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, Timestamp, collectionGroup, where, getDocs, orderBy, limit } from 'firebase/firestore';
 import { jsPDF } from 'jspdf';
 import { auth, db } from './firebase';
@@ -30,56 +32,6 @@ const Modal = ({ show, onClose, onConfirm, title, children }) => {
 
 // --- COMPONENTES PRINCIPALES DE LA UI ---
 
-const Sidebar = ({ onSelect, activeSection, user, open, onClose }) => {
-    const isAdmin = user && user.rol === 'Admin';
-    const handleSelect = (section) => {
-        onSelect(section);
-        if (onClose) onClose();
-    };
-    return (
-        <aside className={`sidebar ${open ? 'open' : ''}`}>
-            <div className="sidebar-header">
-                <h1>Zoonosis</h1>
-                <p>San Isidro</p>
-            </div>
-            <nav className="sidebar-nav">
-                <SidebarLink icon="fa-tachometer-alt" text="Dashboard" section="dashboard" activeSection={activeSection} onSelect={handleSelect} />
-                <SidebarLink icon="fa-users" text="Vecinos y Mascotas" section="vecinosList" activeSection={activeSection} onSelect={handleSelect} />
-                <SidebarLink icon="fa-boxes-stacked" text="Gestión de Stock" section="stock" activeSection={activeSection} onSelect={handleSelect} />
-                <SidebarLink icon="fa-chart-pie" text="Reportes" section="reportes" activeSection={activeSection} onSelect={handleSelect} />
-                {isAdmin && (
-                    <div className="sidebar-section-divider">
-                        <p className="sidebar-section-title">Administración</p>
-                        <SidebarLink icon="fa-user-shield" text="Gestión de Usuarios" section="usuarios" activeSection={activeSection} onSelect={handleSelect} />
-                        <SidebarLink icon="fa-file-alt" text="Logs" section="logs" activeSection={activeSection} onSelect={handleSelect} />
-                    </div>
-                )}
-            </nav>
-            <div className="sidebar-footer">
-                {user && (
-                    <div className="user-profile">
-                        <img src={`https://placehold.co/40x40/a7f3d0/14532d?text=${user.nombre ? user.nombre.charAt(0) : 'U'}`} alt="Avatar" />
-                        <div className="user-info">
-                            <p className="user-name">{user.nombre || 'Usuario'}</p>
-                            <p className="user-role">{user.rol || 'Rol'}</p>
-                            <button className="button-logout" onClick={() => console.log("Cerrar sesión")}>Cerrar Sesión</button>
-                        </div>
-                    </div>
-                )}
-            </div>
-        </aside>
-    );
-};
-
-const SidebarLink = ({ icon, text, section, activeSection, onSelect }) => {
-    const isActive = activeSection.split('-')[0] === section.split('-')[0];
-    return (
-        <button className={`sidebar-link ${isActive ? 'active' : ''}`} onClick={() => onSelect(section)}>
-            <i className={`fas ${icon}`}></i>
-            <span>{text}</span>
-        </button>
-    );
-};
 
 // --- COMPONENTES DE SECCIONES ---
 
@@ -403,6 +355,7 @@ const AtencionForm = ({ onBack, mascotaId, vecinoId }) => {
 
 const CertificadoVacunacion = ({ vecino, mascota, onBack }) => {
     const [vacunas, setVacunas] = useState([]);
+    const CERT_TITLE = 'Certificado de Vacunación';
 
     useEffect(() => {
         if (!vecino || !mascota) return;
@@ -419,7 +372,7 @@ const CertificadoVacunacion = ({ vecino, mascota, onBack }) => {
     const enviarPDF = () => {
         const doc = new jsPDF();
         doc.setFontSize(16);
-        doc.text('Certificado de Vacunación', 105, 20, { align: 'center' });
+        doc.text(CERT_TITLE, 105, 20, { align: 'center' });
         doc.setFontSize(12);
         doc.text(`Dueño: ${vecino.nombre} ${vecino.apellido}`, 20, 40);
         doc.text(`Domicilio: ${vecino.domicilio}`, 20, 48);
@@ -460,13 +413,16 @@ const CertificadoVacunacion = ({ vecino, mascota, onBack }) => {
 };
 
 const Stock = () => {
-    // Datos de ejemplo. En un futuro se leerían de Firebase.
-    const insumos = [
-        { id: 1, nombre: 'Guantes de examinación (caja x100)', stock: 50, min: 20, estado: 'OK' },
-        { id: 2, nombre: 'Gasas estériles (paquete x10)', stock: 15, min: 30, estado: 'Bajo' },
-        { id: 3, nombre: 'Vacuna Antirrábica (dosis)', stock: 120, min: 50, estado: 'OK' },
-        { id: 4, nombre: 'Hojas de bisturí N°10 (caja x50)', stock: 5, min: 10, estado: 'Crítico' },
-    ];
+    const [insumos, setInsumos] = useState([]);
+
+    useEffect(() => {
+        const q = query(collection(db, 'insumos'), orderBy('nombre'));
+        const unsubscribe = onSnapshot(q, (snap) => {
+            const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            setInsumos(data);
+        });
+        return () => unsubscribe();
+    }, []);
 
     const getEstadoClass = (estado) => {
         if (estado === 'OK') return 'estado-ok';
@@ -716,7 +672,20 @@ const App = () => {
     const goToVecinos = () => setActiveSection('vecinosList');
     const goToStock = () => setActiveSection('stock');
 
+    const handleSidebarSelect = (section) => {
+        if (section === 'logout') {
+            signOut(auth);
+            return;
+        }
+        setActiveSection(section);
+    };
+
+    const handleLogin = (email, password) => {
+        return signInWithEmailAndPassword(auth, email, password);
+    };
+
     if (loading) return <div className="loading-screen">Cargando aplicación...</div>;
+    if (!user) return <Login onLogin={handleLogin} />;
 
     const renderContent = () => {
         switch (activeSection) {
@@ -852,7 +821,7 @@ const App = () => {
             `}</style>
             <div className="app-container">
                 <Sidebar
-                    onSelect={setActiveSection}
+                    onSelect={handleSidebarSelect}
                     activeSection={activeSection}
                     user={user}
                     open={sidebarOpen}
