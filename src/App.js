@@ -4,16 +4,16 @@ import React, { useState, useEffect } from 'react';
 // Se integra directamente para evitar errores de importación.
 import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query } from 'firebase/firestore';
+import { getFirestore, collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, Timestamp } from 'firebase/firestore';
 
 // ▼▼▼ ATENCIÓN: PEGA AQUÍ TU CONFIGURACIÓN DE FIREBASE (del Paso 5) ▼▼▼
 const firebaseConfig = {
-  apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
-  authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.REACT_APP_FIREBASE_APP_ID
+  apiKey: "TU_API_KEY",
+  authDomain: "TU_AUTH_DOMAIN",
+  projectId: "TU_PROJECT_ID",
+  storageBucket: "TU_STORAGE_BUCKET",
+  messagingSenderId: "TU_MESSAGING_SENDER_ID",
+  appId: "TU_APP_ID"
 };
 // ▲▲▲ FIN DE LA CONFIGURACIÓN DE FIREBASE ▲▲▲
 
@@ -25,16 +25,12 @@ const db = getFirestore(app);
 // --- COMPONENTES AUXILIARES ---
 
 const Modal = ({ show, onClose, onConfirm, title, children }) => {
-    if (!show) {
-        return null;
-    }
+    if (!show) return null;
     return (
         <div className="modal-backdrop">
             <div className="modal-content">
                 <h3 className="modal-title">{title}</h3>
-                <div className="modal-body">
-                    {children}
-                </div>
+                <div className="modal-body">{children}</div>
                 <div className="modal-actions">
                     <button className="button button-secondary" onClick={onClose}>Cancelar</button>
                     <button className="button button-danger" onClick={onConfirm}>Confirmar</button>
@@ -74,7 +70,7 @@ const Sidebar = ({ onSelect, activeSection, user }) => {
                         <div className="user-info">
                             <p className="user-name">{user.nombre || 'Usuario'}</p>
                             <p className="user-role">{user.rol || 'Rol'}</p>
-                            <a href="#">Cerrar Sesión</a>
+                            <button className="button-logout" onClick={() => console.log("Cerrar sesión")}>Cerrar Sesión</button>
                         </div>
                     </div>
                 )}
@@ -86,10 +82,10 @@ const Sidebar = ({ onSelect, activeSection, user }) => {
 const SidebarLink = ({ icon, text, section, activeSection, onSelect }) => {
     const isActive = activeSection.split('-')[0] === section.split('-')[0];
     return (
-        <a href="#" className={`sidebar-link ${isActive ? 'active' : ''}`} onClick={() => onSelect(section)}>
+        <button className={`sidebar-link ${isActive ? 'active' : ''}`} onClick={() => onSelect(section)}>
             <i className={`fas ${icon}`}></i>
             <span>{text}</span>
-        </a>
+        </button>
     );
 };
 
@@ -111,10 +107,7 @@ const VecinosList = ({ onSelectVecino, onShowForm }) => {
     useEffect(() => {
         const q = query(collection(db, "vecinos"));
         const unsubscribe = onSnapshot(q, (querySnapshot) => {
-            const vecinosData = [];
-            querySnapshot.forEach((doc) => {
-                vecinosData.push({ id: doc.id, ...doc.data() });
-            });
+            const vecinosData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setVecinos(vecinosData);
             setLoading(false);
         }, (error) => {
@@ -124,9 +117,7 @@ const VecinosList = ({ onSelectVecino, onShowForm }) => {
         return () => unsubscribe();
     }, []);
 
-    if (loading) {
-        return <div className="card">Cargando vecinos...</div>;
-    }
+    if (loading) return <div className="card">Cargando vecinos...</div>;
 
     return (
         <section>
@@ -138,24 +129,16 @@ const VecinosList = ({ onSelectVecino, onShowForm }) => {
             </div>
             <div className="card">
                 <table className="table">
-                    <thead>
-                        <tr><th>Nombre y Apellido</th><th>DNI</th><th>Email</th><th style={{ textAlign: 'center' }}>Acciones</th></tr>
-                    </thead>
+                    <thead><tr><th>Nombre y Apellido</th><th>DNI</th><th>Email</th><th style={{ textAlign: 'center' }}>Acciones</th></tr></thead>
                     <tbody>
                         {vecinos.length > 0 ? vecinos.map(vecino => (
                             <tr key={vecino.id}>
                                 <td>{vecino.nombre} {vecino.apellido}</td>
                                 <td>{vecino.dni}</td>
                                 <td>{vecino.email}</td>
-                                <td style={{ textAlign: 'center' }}>
-                                    <button className="button-link" onClick={() => onSelectVecino(vecino)}>
-                                        <i className="fas fa-eye"></i> Ver Ficha
-                                    </button>
-                                </td>
+                                <td style={{ textAlign: 'center' }}><button className="button-link" onClick={() => onSelectVecino(vecino)}><i className="fas fa-eye"></i> Ver Ficha</button></td>
                             </tr>
-                        )) : (
-                            <tr><td colSpan="4">No hay vecinos registrados.</td></tr>
-                        )}
+                        )) : (<tr><td colSpan="4">No hay vecinos registrados.</td></tr>)}
                     </tbody>
                 </table>
             </div>
@@ -165,34 +148,19 @@ const VecinosList = ({ onSelectVecino, onShowForm }) => {
 
 const VecinoForm = ({ onBack, currentVecino }) => {
     const isEditMode = !!currentVecino;
-    const [formData, setFormData] = useState({
-        nombre: '', apellido: '', dni: '', telefono: '', domicilio: '', email: ''
-    });
+    const [formData, setFormData] = useState({ nombre: '', apellido: '', dni: '', telefono: '', domicilio: '', email: '' });
 
-    useEffect(() => {
-        if (isEditMode) {
-            setFormData(currentVecino);
-        }
-    }, [currentVecino, isEditMode]);
+    useEffect(() => { if (isEditMode) setFormData(currentVecino); }, [currentVecino, isEditMode]);
 
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
-    };
+    const handleChange = (e) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            if (isEditMode) {
-                const docRef = doc(db, 'vecinos', currentVecino.id);
-                await updateDoc(docRef, formData);
-            } else {
-                await addDoc(collection(db, 'vecinos'), formData);
-            }
+            if (isEditMode) await updateDoc(doc(db, 'vecinos', currentVecino.id), formData);
+            else await addDoc(collection(db, 'vecinos'), formData);
             onBack();
-        } catch (error) {
-            console.error("Error al guardar vecino: ", error);
-        }
+        } catch (error) { console.error("Error al guardar vecino: ", error); }
     };
 
     return (
@@ -218,7 +186,7 @@ const VecinoForm = ({ onBack, currentVecino }) => {
     );
 };
 
-const VecinoDetail = ({ vecino, onEditVecino, onShowForm, onDeleteVecino }) => {
+const VecinoDetail = ({ vecino, onEditVecino, onShowForm, onDeleteVecino, onSelectMascota }) => {
     const [mascotas, setMascotas] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -227,36 +195,24 @@ const VecinoDetail = ({ vecino, onEditVecino, onShowForm, onDeleteVecino }) => {
         if (!vecino) return;
         const q = query(collection(db, `vecinos/${vecino.id}/mascotas`));
         const unsubscribe = onSnapshot(q, (querySnapshot) => {
-            const mascotasData = [];
-            querySnapshot.forEach((doc) => {
-                mascotasData.push({ id: doc.id, ...doc.data() });
-            });
-            setMascotas(mascotasData);
+            setMascotas(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
             setLoading(false);
-        }, (error) => {
-            console.error("Error al obtener mascotas: ", error);
-            setLoading(false);
-        });
+        }, (error) => { console.error("Error al obtener mascotas: ", error); setLoading(false); });
         return () => unsubscribe();
     }, [vecino]);
 
     const handleDelete = async () => {
         try {
             await deleteDoc(doc(db, 'vecinos', vecino.id));
-            onDeleteVecino(); // Esta función debería volver a la lista de vecinos
-        } catch (error) {
-            console.error("Error al eliminar vecino:", error);
-        }
+            onDeleteVecino();
+        } catch (error) { console.error("Error al eliminar vecino:", error); }
         setShowDeleteModal(false);
     }
 
     return (
         <section>
-            <div className="header-actions">
-                <h2 className="section-title" style={{ marginBottom: 0 }}>Ficha del Vecino</h2>
-                <div>
-                    <button className="button button-danger" onClick={() => setShowDeleteModal(true)}><i className="fas fa-trash-alt"></i> Eliminar Vecino</button>
-                </div>
+            <div className="header-actions"><h2 className="section-title" style={{ marginBottom: 0 }}>Ficha del Vecino</h2>
+                <button className="button button-danger" onClick={() => setShowDeleteModal(true)}><i className="fas fa-trash-alt"></i> Eliminar Vecino</button>
             </div>
             <div className="card mb-6">
                 <div className="vecino-detail-grid">
@@ -270,43 +226,26 @@ const VecinoDetail = ({ vecino, onEditVecino, onShowForm, onDeleteVecino }) => {
                     <button className="button button-secondary" onClick={() => onEditVecino(vecino)}><i className="fas fa-edit"></i> Editar Datos</button>
                 </div>
             </div>
-
             <div className="header-actions">
                 <h3 className="section-subtitle">Mascotas Registradas</h3>
-                <button className="button button-primary" onClick={() => onShowForm('mascotaForm', { mode: 'new', vecinoId: vecino.id })}>
-                    <i className="fas fa-plus"></i> Nueva Mascota
-                </button>
+                <button className="button button-primary" onClick={() => onShowForm('mascotaForm', { mode: 'new', vecinoId: vecino.id })}><i className="fas fa-plus"></i> Nueva Mascota</button>
             </div>
             <div className="card">
                  <table className="table">
-                    <thead>
-                        <tr><th>Nombre</th><th>Especie</th><th>Raza</th><th style={{ textAlign: 'center' }}>Acciones</th></tr>
-                    </thead>
+                    <thead><tr><th>Nombre</th><th>Especie</th><th>Raza</th><th style={{ textAlign: 'center' }}>Acciones</th></tr></thead>
                     <tbody>
-                        {loading ? (
-                            <tr><td colSpan="4">Cargando mascotas...</td></tr>
-                        ) : mascotas.length > 0 ? mascotas.map(mascota => (
+                        {loading ? (<tr><td colSpan="4">Cargando mascotas...</td></tr>) 
+                        : mascotas.length > 0 ? mascotas.map(mascota => (
                             <tr key={mascota.id}>
-                                <td>{mascota.nombre}</td>
-                                <td>{mascota.especie}</td>
-                                <td>{mascota.raza}</td>
-                                <td style={{ textAlign: 'center' }}>
-                                    <button className="button-link"><i className="fas fa-file-medical"></i> Ver Historial</button>
-                                </td>
+                                <td>{mascota.nombre}</td><td>{mascota.especie}</td><td>{mascota.raza}</td>
+                                <td style={{ textAlign: 'center' }}><button className="button-link" onClick={() => onSelectMascota(mascota)}><i className="fas fa-file-medical"></i> Ver Historial</button></td>
                             </tr>
-                        )) : (
-                            <tr><td colSpan="4">Este vecino no tiene mascotas registradas.</td></tr>
-                        )}
+                        )) : (<tr><td colSpan="4">Este vecino no tiene mascotas registradas.</td></tr>)}
                     </tbody>
                 </table>
             </div>
-            <Modal
-                show={showDeleteModal}
-                onClose={() => setShowDeleteModal(false)}
-                onConfirm={handleDelete}
-                title="Confirmar Eliminación"
-            >
-                <p>¿Estás seguro de que deseas eliminar a <strong>{vecino.nombre} {vecino.apellido}</strong>? Esta acción no se puede deshacer y eliminará también a todas sus mascotas.</p>
+            <Modal show={showDeleteModal} onClose={() => setShowDeleteModal(false)} onConfirm={handleDelete} title="Confirmar Eliminación">
+                <p>¿Estás seguro de que deseas eliminar a <strong>{vecino.nombre} {vecino.apellido}</strong>? Esta acción no se puede deshacer.</p>
             </Modal>
         </section>
     );
@@ -314,35 +253,20 @@ const VecinoDetail = ({ vecino, onEditVecino, onShowForm, onDeleteVecino }) => {
 
 const MascotaForm = ({ onBack, currentMascota, vecinoId }) => {
     const isEditMode = !!currentMascota;
-    const [formData, setFormData] = useState({
-        nombre: '', especie: 'Perro', raza: '', sexo: 'Macho', fechaNac: '', color: '', señas: ''
-    });
+    const [formData, setFormData] = useState({ nombre: '', especie: 'Perro', raza: '', sexo: 'Macho', fechaNac: '', color: '', señas: '' });
 
-    useEffect(() => {
-        if (isEditMode) {
-            setFormData(currentMascota);
-        }
-    }, [currentMascota, isEditMode]);
+    useEffect(() => { if (isEditMode) setFormData(currentMascota); }, [currentMascota, isEditMode]);
 
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
-    };
+    const handleChange = (e) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
             const collectionPath = `vecinos/${vecinoId}/mascotas`;
-            if (isEditMode) {
-                const docRef = doc(db, collectionPath, currentMascota.id);
-                await updateDoc(docRef, formData);
-            } else {
-                await addDoc(collection(db, collectionPath), formData);
-            }
+            if (isEditMode) await updateDoc(doc(db, collectionPath, currentMascota.id), formData);
+            else await addDoc(collection(db, collectionPath), formData);
             onBack();
-        } catch (error) {
-            console.error("Error al guardar mascota: ", error);
-        }
+        } catch (error) { console.error("Error al guardar mascota: ", error); }
     };
 
     return (
@@ -369,28 +293,146 @@ const MascotaForm = ({ onBack, currentMascota, vecinoId }) => {
     );
 };
 
+const MascotaDetail = ({ mascota, vecino, onBack, onShowForm }) => {
+    const [atenciones, setAtenciones] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (!vecino || !mascota) return;
+        const q = query(collection(db, `vecinos/${vecino.id}/mascotas/${mascota.id}/atenciones`));
+        const unsubscribe = onSnapshot(q, (querySnapshot) => {
+            setAtenciones(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            setLoading(false);
+        });
+        return () => unsubscribe();
+    }, [vecino, mascota]);
+
+    return (
+        <section>
+            <button className="button-link mb-6" onClick={onBack}><i className="fas fa-arrow-left"></i> Volver a la Ficha del Vecino</button>
+            <div className="header-actions">
+                <h2 className="section-title" style={{ marginBottom: 0 }}>Historial de {mascota.nombre}</h2>
+                <button className="button button-primary" onClick={() => onShowForm('atencionForm', { mode: 'new', mascotaId: mascota.id, vecinoId: vecino.id })}>
+                    <i className="fas fa-plus"></i> Nueva Atención
+                </button>
+            </div>
+            <div className="card">
+                {loading ? <p>Cargando historial...</p> : atenciones.length > 0 ? (
+                    <div className="atenciones-list">
+                        {atenciones.map(atencion => (
+                            <div key={atencion.id} className="atencion-item card">
+                                <div className="atencion-header">
+                                    <h4 className="atencion-title">{atencion.tipo}</h4>
+                                    <span className="atencion-date">{atencion.fecha.toDate().toLocaleDateString()} - {atencion.sede}</span>
+                                </div>
+                                <p><strong>Motivo:</strong> {atencion.motivo}</p>
+                                <p><strong>Observaciones:</strong> {atencion.observaciones}</p>
+                            </div>
+                        ))}
+                    </div>
+                ) : <p>No hay atenciones registradas para esta mascota.</p>}
+            </div>
+        </section>
+    );
+};
+
+const AtencionForm = ({ onBack, mascotaId, vecinoId }) => {
+    const [formData, setFormData] = useState({
+        fecha: Timestamp.now(), sede: 'Sede Central', tipo: 'Clínica', motivo: '', observaciones: ''
+    });
+
+    const handleChange = (e) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        try {
+            const collectionPath = `vecinos/${vecinoId}/mascotas/${mascotaId}/atenciones`;
+            await addDoc(collection(db, collectionPath), formData);
+            onBack();
+        } catch (error) { console.error("Error al guardar atención: ", error); }
+    };
+
+    return (
+        <section>
+            <h2 className="section-title">Registrar Atención</h2>
+            <div className="card form-container">
+                <form onSubmit={handleSubmit}>
+                    <div className="form-grid">
+                        <div className="form-field"><label>Sede</label><select name="sede" value={formData.sede} onChange={handleChange}><option>Sede Central</option><option>Quirófano Móvil</option></select></div>
+                        <div className="form-field"><label>Tipo de Atención</label><select name="tipo" value={formData.tipo} onChange={handleChange}><option>Clínica</option><option>Vacunación</option><option>Castración</option></select></div>
+                        <div className="form-field full-width"><label>Motivo / Diagnóstico</label><input name="motivo" value={formData.motivo} onChange={handleChange} required /></div>
+                        <div className="form-field full-width"><label>Observaciones y Recomendaciones</label><textarea name="observaciones" value={formData.observaciones} onChange={handleChange} rows="4"></textarea></div>
+                    </div>
+                    <div className="form-actions">
+                        <button type="button" className="button button-secondary" onClick={onBack}>Cancelar</button>
+                        <button type="submit" className="button button-primary">Guardar Atención</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+    );
+};
+
+const Stock = () => {
+    // Datos de ejemplo. En un futuro se leerían de Firebase.
+    const insumos = [
+        { id: 1, nombre: 'Guantes de examinación (caja x100)', stock: 50, min: 20, estado: 'OK' },
+        { id: 2, nombre: 'Gasas estériles (paquete x10)', stock: 15, min: 30, estado: 'Bajo' },
+        { id: 3, nombre: 'Vacuna Antirrábica (dosis)', stock: 120, min: 50, estado: 'OK' },
+        { id: 4, nombre: 'Hojas de bisturí N°10 (caja x50)', stock: 5, min: 10, estado: 'Crítico' },
+    ];
+
+    const getEstadoClass = (estado) => {
+        if (estado === 'OK') return 'estado-ok';
+        if (estado === 'Bajo') return 'estado-bajo';
+        if (estado === 'Crítico') return 'estado-critico';
+        return '';
+    };
+    
+    return (
+        <section>
+            <div className="header-actions">
+                <h2 className="section-title" style={{ marginBottom: 0 }}>Gestión de Stock</h2>
+                <button className="button button-primary"><i className="fas fa-plus"></i> Nuevo Insumo</button>
+            </div>
+            <div className="card">
+                <table className="table">
+                    <thead><tr><th>Insumo</th><th style={{textAlign: 'center'}}>Stock Actual</th><th style={{textAlign: 'center'}}>Stock Mínimo</th><th style={{textAlign: 'center'}}>Estado</th></tr></thead>
+                    <tbody>
+                        {insumos.map(insumo => (
+                            <tr key={insumo.id}>
+                                <td>{insumo.nombre}</td>
+                                <td style={{textAlign: 'center'}}>{insumo.stock}</td>
+                                <td style={{textAlign: 'center'}}>{insumo.min}</td>
+                                <td style={{textAlign: 'center'}}><span className={`estado-badge ${getEstadoClass(insumo.estado)}`}>{insumo.estado}</span></td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    );
+};
+
+
 // --- COMPONENTE PRINCIPAL DE LA APLICACIÓN ---
 const App = () => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [activeSection, setActiveSection] = useState('dashboard');
     const [selectedVecino, setSelectedVecino] = useState(null);
+    const [selectedMascota, setSelectedMascota] = useState(null);
     const [formState, setFormState] = useState({ mode: 'new', data: null });
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-            if (firebaseUser) {
-                // En un futuro, aquí se buscaría el perfil del usuario en Firestore
-                setUser({ uid: firebaseUser.uid, nombre: 'Admin', rol: 'Admin' });
-            } else {
-                setUser(null);
-            }
+            setUser(firebaseUser ? { uid: firebaseUser.uid, nombre: 'Admin', rol: 'Admin' } : null);
             setLoading(false);
         });
         return () => unsubscribe();
     }, []);
 
-    const handleShowForm = (section, state = { mode: 'new', data: null }) => {
+    const handleShowForm = (section, state = { mode: 'new' }) => {
         setFormState(state);
         setActiveSection(section);
     };
@@ -399,23 +441,34 @@ const App = () => {
         setSelectedVecino(vecino);
         setActiveSection('vecinoDetail');
     };
+
+    const handleSelectMascota = (mascota) => {
+        setSelectedMascota(mascota);
+        setActiveSection('mascotaDetail');
+    };
     
-    const handleBackToVecinos = () => {
+    const handleBackToVecinosList = () => {
         setSelectedVecino(null);
         setActiveSection('vecinosList');
     }
 
-    if (loading) {
-        return <div className="loading-screen">Cargando aplicación...</div>;
+    const handleBackToVecinoDetail = () => {
+        setSelectedMascota(null);
+        setActiveSection('vecinoDetail');
     }
+
+    if (loading) return <div className="loading-screen">Cargando aplicación...</div>;
 
     const renderContent = () => {
         switch (activeSection) {
             case 'dashboard': return <Dashboard />;
             case 'vecinosList': return <VecinosList onSelectVecino={handleSelectVecino} onShowForm={handleShowForm} />;
-            case 'vecinoForm': return <VecinoForm onBack={handleBackToVecinos} currentVecino={formState.mode === 'edit' ? formState.data : null} />;
-            case 'vecinoDetail': return <VecinoDetail vecino={selectedVecino} onEditVecino={(v) => handleShowForm('vecinoForm', { mode: 'edit', data: v })} onShowForm={handleShowForm} onDeleteVecino={handleBackToVecinos} />;
-            case 'mascotaForm': return <MascotaForm onBack={() => setActiveSection('vecinoDetail')} vecinoId={formState.vecinoId} currentMascota={formState.mode === 'edit' ? formState.data : null} />;
+            case 'vecinoForm': return <VecinoForm onBack={handleBackToVecinosList} currentVecino={formState.mode === 'edit' ? formState.data : null} />;
+            case 'vecinoDetail': return <VecinoDetail vecino={selectedVecino} onEditVecino={(v) => handleShowForm('vecinoForm', { mode: 'edit', data: v })} onShowForm={handleShowForm} onDeleteVecino={handleBackToVecinosList} onSelectMascota={handleSelectMascota} />;
+            case 'mascotaForm': return <MascotaForm onBack={() => setActiveSection('vecinoDetail')} vecinoId={selectedVecino?.id} currentMascota={formState.mode === 'edit' ? formState.data : null} />;
+            case 'mascotaDetail': return <MascotaDetail mascota={selectedMascota} vecino={selectedVecino} onBack={handleBackToVecinoDetail} onShowForm={handleShowForm} />;
+            case 'atencionForm': return <AtencionForm onBack={() => setActiveSection('mascotaDetail')} vecinoId={formState.vecinoId} mascotaId={formState.mascotaId} />;
+            case 'stock': return <Stock />;
             default: return <Dashboard />;
         }
     };
@@ -448,7 +501,7 @@ const App = () => {
                 .sidebar-header h1 { font-size: 1.5rem; font-weight: 700; }
                 .sidebar-header p { font-size: 0.875rem; color: #a7f3d0; }
                 .sidebar-nav { flex: 1; padding: 1rem; display: flex; flex-direction: column; gap: 0.5rem; }
-                .sidebar-link { display: flex; align-items: center; padding: 0.75rem; border-radius: 0.5rem; transition: all 0.2s ease-in-out; text-decoration: none; color: white; }
+                .sidebar-link { display: flex; align-items: center; padding: 0.75rem; border-radius: 0.5rem; transition: all 0.2s ease-in-out; text-decoration: none; color: white; background: none; border: none; width: 100%; text-align: left; font-family: inherit; font-size: inherit; cursor: pointer; }
                 .sidebar-link:hover { background-color: #166534; }
                 .sidebar-link.active { background-color: #166534; transform: translateX(4px); }
                 .sidebar-link i { width: 1.5rem; text-align: center; margin-right: 0.75rem; }
@@ -461,8 +514,8 @@ const App = () => {
                 .user-info p { margin: 0; line-height: 1.2; }
                 .user-info .user-name { font-weight: 600; }
                 .user-info .user-role { font-size: 0.75rem; color: #a7f3d0; }
-                .user-info a { font-size: 0.875rem; color: #a7f3d0; text-decoration: none; }
-                .user-info a:hover { color: white; }
+                .button-logout { font-size: 0.875rem; color: #a7f3d0; text-decoration: none; background: none; border: none; padding: 0; cursor: pointer; text-align: left; }
+                .button-logout:hover { color: white; }
                 /* Formularios y Tablas */
                 .form-container { max-width: 48rem; margin: auto; }
                 .form-grid { display: grid; grid-template-columns: repeat(1, 1fr); gap: 1.5rem; }
@@ -480,6 +533,18 @@ const App = () => {
                 .header-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
                 /* Detalles */
                 .vecino-detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; }
+                /* Atenciones */
+                .atenciones-list { display: flex; flex-direction: column; gap: 1rem; }
+                .atencion-item { padding: 1rem; border: 1px solid #e5e7eb; }
+                .atencion-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.5rem; }
+                .atencion-title { margin: 0; font-size: 1.125rem; color: #14532d; }
+                .atencion-date { font-size: 0.875rem; color: #6b7280; }
+                .atencion-item p { margin: 0.25rem 0; }
+                /* Stock */
+                .estado-badge { font-size: 0.75rem; font-weight: 600; padding: 0.25rem 0.75rem; border-radius: 9999px; }
+                .estado-ok { background-color: #dcfce7; color: #166534; }
+                .estado-bajo { background-color: #fef9c3; color: #854d0e; }
+                .estado-critico { background-color: #fee2e2; color: #991b1b; }
                 /* Modal */
                 .modal-backdrop { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.5); display: flex; justify-content: center; align-items: center; z-index: 1000; }
                 .modal-content { background-color: white; padding: 2rem; border-radius: 0.75rem; max-width: 500px; width: 90%; box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1); }
@@ -499,3 +564,4 @@ const App = () => {
 };
 
 export default App;
+
