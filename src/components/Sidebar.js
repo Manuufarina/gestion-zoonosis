@@ -3,10 +3,14 @@ import React from 'react';
 const SidebarLink = ({ icon, text, section, activeSection, onSelect }) => {
   const isActive = activeSection.split('-')[0] === section.split('-')[0];
   return (
-    <a href="#" className={`sidebar-link ${isActive ? 'active' : ''}`} onClick={() => onSelect(section)}>
+    <button
+      type="button"
+      className={`sidebar-link ${isActive ? 'active' : ''}`}
+      onClick={() => onSelect(section)}
+    >
       <i className={`fas ${icon}`}></i>
       <span>{text}</span>
-    </a>
+    </button>
   );
 };
 
@@ -37,7 +41,9 @@ const Sidebar = ({ onSelect, activeSection, user }) => {
             <div className="user-info">
               <p className="user-name">{user.nombre || 'Usuario'}</p>
               <p className="user-role">{user.rol || 'Rol'}</p>
-              <a href="#">Cerrar Sesión</a>
+              <button type="button" className="button-link" onClick={() => onSelect('logout')}>
+                Cerrar Sesión
+              </button>
             </div>
           </div>
         )}

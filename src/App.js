@@ -105,7 +105,7 @@ const App = () => {
                 .sidebar-header h1 { font-size: 1.5rem; font-weight: 700; }
                 .sidebar-header p { font-size: 0.875rem; color: #a7f3d0; }
                 .sidebar-nav { flex: 1; padding: 1rem; display: flex; flex-direction: column; gap: 0.5rem; }
-                .sidebar-link { display: flex; align-items: center; padding: 0.75rem; border-radius: 0.5rem; transition: all 0.2s ease-in-out; text-decoration: none; color: white; }
+                .sidebar-link { display: flex; align-items: center; padding: 0.75rem; border-radius: 0.5rem; transition: all 0.2s ease-in-out; text-decoration: none; color: white; background: none; border: none; cursor: pointer; text-align: left; width: 100%; }
                 .sidebar-link:hover { background-color: #166534; }
                 .sidebar-link.active { background-color: #166534; transform: translateX(4px); }
                 .sidebar-link i { width: 1.5rem; text-align: center; margin-right: 0.75rem; }
