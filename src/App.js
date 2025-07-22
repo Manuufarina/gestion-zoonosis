@@ -3,9 +3,10 @@ import React, { useState, useEffect } from 'react';
 // --- CONFIGURACIÓN E INICIALIZACIÓN DE FIREBASE ---
 // Se integra directamente para evitar errores de importación.
 import { onAuthStateChanged } from 'firebase/auth';
-import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, Timestamp, collectionGroup, where } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, Timestamp, collectionGroup, where, getDocs } from 'firebase/firestore';
 import { jsPDF } from 'jspdf';
 import { auth, db } from './firebase';
+import { logUserAction } from './logger';
 
 
 // --- COMPONENTES AUXILIARES ---
@@ -157,8 +158,13 @@ const VecinoForm = ({ onBack, currentVecino }) => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            if (isEditMode) await updateDoc(doc(db, 'vecinos', currentVecino.id), formData);
-            else await addDoc(collection(db, 'vecinos'), formData);
+            if (isEditMode) {
+                await updateDoc(doc(db, 'vecinos', currentVecino.id), formData);
+                logUserAction(auth.currentUser?.uid, 'editar vecino', { id: currentVecino.id });
+            } else {
+                const docRef = await addDoc(collection(db, 'vecinos'), formData);
+                logUserAction(auth.currentUser?.uid, 'crear vecino', { id: docRef.id });
+            }
             onBack();
         } catch (error) { console.error("Error al guardar vecino: ", error); }
     };
@@ -205,6 +211,7 @@ const VecinoDetail = ({ vecino, onEditVecino, onShowForm, onDeleteVecino, onSele
     const handleDelete = async () => {
         try {
             await deleteDoc(doc(db, 'vecinos', vecino.id));
+            logUserAction(auth.currentUser?.uid, 'eliminar vecino', { id: vecino.id });
             onDeleteVecino();
         } catch (error) { console.error("Error al eliminar vecino:", error); }
         setShowDeleteModal(false);
@@ -270,8 +277,13 @@ const MascotaForm = ({ onBack, currentMascota, vecinoId }) => {
         e.preventDefault();
         try {
             const collectionPath = `vecinos/${vecinoId}/mascotas`;
-            if (isEditMode) await updateDoc(doc(db, collectionPath, currentMascota.id), formData);
-            else await addDoc(collection(db, collectionPath), formData);
+            if (isEditMode) {
+                await updateDoc(doc(db, collectionPath, currentMascota.id), formData);
+                logUserAction(auth.currentUser?.uid, 'editar mascota', { id: currentMascota.id });
+            } else {
+                const docRef = await addDoc(collection(db, collectionPath), formData);
+                logUserAction(auth.currentUser?.uid, 'crear mascota', { id: docRef.id });
+            }
             onBack();
         } catch (error) { console.error("Error al guardar mascota: ", error); }
     };
@@ -357,7 +369,8 @@ const AtencionForm = ({ onBack, mascotaId, vecinoId }) => {
         e.preventDefault();
         try {
             const collectionPath = `vecinos/${vecinoId}/mascotas/${mascotaId}/atenciones`;
-            await addDoc(collection(db, collectionPath), formData);
+            const docRef = await addDoc(collection(db, collectionPath), formData);
+            logUserAction(auth.currentUser?.uid, 'registrar atencion', { id: docRef.id, tipo: formData.tipo });
             onBack();
         } catch (error) { console.error("Error al guardar atención: ", error); }
     };
@@ -482,6 +495,99 @@ const Stock = () => {
     );
 };
 
+const Usuarios = () => {
+    const [usuarios, setUsuarios] = useState([]);
+    const [formData, setFormData] = useState({ nombre: '', email: '', rol: 'Operador' });
+
+    useEffect(() => {
+        const unsub = onSnapshot(collection(db, 'usuarios'), snap => {
+            setUsuarios(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        });
+        return () => unsub();
+    }, []);
+
+    const handleChange = e => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+
+    const handleSubmit = async e => {
+        e.preventDefault();
+        try {
+            const docRef = await addDoc(collection(db, 'usuarios'), formData);
+            logUserAction(auth.currentUser?.uid, 'crear usuario', { id: docRef.id });
+            setFormData({ nombre: '', email: '', rol: 'Operador' });
+        } catch (err) {
+            console.error('Error creando usuario', err);
+        }
+    };
+
+    return (
+        <section>
+            <h2 className="section-title">Gestión de Usuarios</h2>
+            <div className="card form-container">
+                <form onSubmit={handleSubmit}>
+                    <div className="form-grid">
+                        <div className="form-field"><label>Nombre</label><input name="nombre" value={formData.nombre} onChange={handleChange} required /></div>
+                        <div className="form-field"><label>Email</label><input name="email" value={formData.email} onChange={handleChange} required /></div>
+                        <div className="form-field"><label>Rol</label><select name="rol" value={formData.rol} onChange={handleChange}><option>Operador</option><option>Admin</option></select></div>
+                    </div>
+                    <div className="form-actions">
+                        <button type="submit" className="button button-primary">Crear Usuario</button>
+                    </div>
+                </form>
+            </div>
+            <div className="card" style={{ marginTop: '1rem' }}>
+                <table className="table">
+                    <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th></tr></thead>
+                    <tbody>
+                        {usuarios.map(u => (
+                            <tr key={u.id}><td>{u.nombre}</td><td>{u.email}</td><td>{u.rol}</td></tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    );
+};
+
+const Reportes = () => {
+    const [desde, setDesde] = useState('');
+    const [hasta, setHasta] = useState('');
+
+    const exportar = async () => {
+        if (!desde || !hasta) return;
+        const desdeTs = Timestamp.fromDate(new Date(desde));
+        const hastaTs = Timestamp.fromDate(new Date(hasta));
+        const q = query(
+            collectionGroup(db, 'atenciones'),
+            where('fecha', '>=', desdeTs),
+            where('fecha', '<=', hastaTs)
+        );
+        const snap = await getDocs(q);
+        const doc = new jsPDF();
+        doc.text('Reporte de Trabajos', 105, 20, { align: 'center' });
+        snap.docs.forEach((d, i) => {
+            const a = d.data();
+            doc.text(`${i + 1}. ${a.tipo} - ${a.motivo} - ${a.sede} - ${a.fecha.toDate().toLocaleDateString()}`, 20, 40 + i * 8);
+        });
+        doc.save('reporte.pdf');
+        logUserAction(auth.currentUser?.uid, 'exportar reporte', { desde, hasta });
+    };
+
+    return (
+        <section>
+            <h2 className="section-title">Reportes</h2>
+            <div className="card form-container">
+                <div className="form-grid">
+                    <div className="form-field"><label>Desde</label><input type="date" value={desde} onChange={e => setDesde(e.target.value)} /></div>
+                    <div className="form-field"><label>Hasta</label><input type="date" value={hasta} onChange={e => setHasta(e.target.value)} /></div>
+                </div>
+                <div className="form-actions">
+                    <button type="button" className="button button-primary" onClick={exportar}>Exportar PDF</button>
+                </div>
+            </div>
+        </section>
+    );
+};
+
 
 // --- COMPONENTE PRINCIPAL DE LA APLICACIÓN ---
 const App = () => {
@@ -556,6 +662,8 @@ const App = () => {
             case 'atencionForm': return <AtencionForm onBack={() => setActiveSection('mascotaDetail')} vecinoId={formState.vecinoId} mascotaId={formState.mascotaId} />;
             case 'certificado': return <CertificadoVacunacion vecino={selectedVecino} mascota={selectedMascota} onBack={() => setActiveSection('mascotaDetail')} />;
             case 'stock': return <Stock />;
+            case 'usuarios': return <Usuarios />;
+            case 'reportes': return <Reportes />;
             default:
                 return <Dashboard goToVecinos={goToVecinos} goToStock={goToStock} stats={{ vecinos: kpiVecinos, mascotas: kpiMascotas, atenciones: kpiAtenciones }} />;
         }
