@@ -30,23 +30,27 @@ const Modal = ({ show, onClose, onConfirm, title, children }) => {
 
 // --- COMPONENTES PRINCIPALES DE LA UI ---
 
-const Sidebar = ({ onSelect, activeSection, user }) => {
+const Sidebar = ({ onSelect, activeSection, user, open, onClose }) => {
     const isAdmin = user && user.rol === 'Admin';
+    const handleSelect = (section) => {
+        onSelect(section);
+        if (onClose) onClose();
+    };
     return (
-        <aside className="sidebar">
+        <aside className={`sidebar ${open ? 'open' : ''}`}>
             <div className="sidebar-header">
                 <h1>Zoonosis</h1>
                 <p>San Isidro</p>
             </div>
             <nav className="sidebar-nav">
-                <SidebarLink icon="fa-tachometer-alt" text="Dashboard" section="dashboard" activeSection={activeSection} onSelect={onSelect} />
-                <SidebarLink icon="fa-users" text="Vecinos y Mascotas" section="vecinosList" activeSection={activeSection} onSelect={onSelect} />
-                <SidebarLink icon="fa-boxes-stacked" text="Gestión de Stock" section="stock" activeSection={activeSection} onSelect={onSelect} />
-                <SidebarLink icon="fa-chart-pie" text="Reportes" section="reportes" activeSection={activeSection} onSelect={onSelect} />
+                <SidebarLink icon="fa-tachometer-alt" text="Dashboard" section="dashboard" activeSection={activeSection} onSelect={handleSelect} />
+                <SidebarLink icon="fa-users" text="Vecinos y Mascotas" section="vecinosList" activeSection={activeSection} onSelect={handleSelect} />
+                <SidebarLink icon="fa-boxes-stacked" text="Gestión de Stock" section="stock" activeSection={activeSection} onSelect={handleSelect} />
+                <SidebarLink icon="fa-chart-pie" text="Reportes" section="reportes" activeSection={activeSection} onSelect={handleSelect} />
                 {isAdmin && (
                     <div className="sidebar-section-divider">
                         <p className="sidebar-section-title">Administración</p>
-                        <SidebarLink icon="fa-user-shield" text="Gestión de Usuarios" section="usuarios" activeSection={activeSection} onSelect={onSelect} />
+                        <SidebarLink icon="fa-user-shield" text="Gestión de Usuarios" section="usuarios" activeSection={activeSection} onSelect={handleSelect} />
                     </div>
                 )}
             </nav>
@@ -600,6 +604,7 @@ const App = () => {
     const [kpiVecinos, setKpiVecinos] = useState(0);
     const [kpiMascotas, setKpiMascotas] = useState(0);
     const [kpiAtenciones, setKpiAtenciones] = useState(0);
+    const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 768);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
@@ -607,6 +612,16 @@ const App = () => {
             setLoading(false);
         });
         return () => unsubscribe();
+    }, []);
+
+    useEffect(() => {
+        const handleResize = () => {
+            if (window.innerWidth >= 768) {
+                setSidebarOpen(true);
+            }
+        };
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
     }, []);
 
     useEffect(() => {
@@ -691,8 +706,17 @@ const App = () => {
                 .button-link { color: #15803d; background: none; border: none; cursor: pointer; font-weight: 600; padding: 0; }
                 .button-link:hover { text-decoration: underline; }
                 .button-link i { margin-right: 0.25rem; }
+                .menu-toggle {
+                    display: none;
+                    background: none;
+                    border: none;
+                    font-size: 1.5rem;
+                    color: #14532d;
+                    margin-bottom: 1rem;
+                    cursor: pointer;
+                }
                 /* Sidebar */
-                .sidebar { width: 16rem; background-color: #14532d; color: white; display: flex; flex-direction: column; flex-shrink: 0; height: 100vh; }
+                .sidebar { width: 16rem; background-color: #14532d; color: white; display: flex; flex-direction: column; flex-shrink: 0; height: 100vh; transition: transform 0.3s ease-in-out; }
                 .sidebar-header { padding: 1.5rem; text-align: center; border-bottom: 1px solid #166534; }
                 .sidebar-header h1 { font-size: 1.5rem; font-weight: 700; }
                 .sidebar-header p { font-size: 0.875rem; color: #a7f3d0; }
@@ -712,6 +736,26 @@ const App = () => {
                 .user-info .user-role { font-size: 0.75rem; color: #a7f3d0; }
                 .button-logout { font-size: 0.875rem; color: #a7f3d0; text-decoration: none; background: none; border: none; padding: 0; cursor: pointer; text-align: left; }
                 .button-logout:hover { color: white; }
+                @media (max-width: 768px) {
+                    .sidebar {
+                        position: fixed;
+                        left: 0;
+                        top: 0;
+                        height: 100%;
+                        transform: translateX(-100%);
+                        transition: transform 0.3s ease-in-out;
+                        z-index: 1000;
+                    }
+                    .sidebar.open {
+                        transform: translateX(0);
+                    }
+                    .main-content {
+                        padding: 1rem;
+                    }
+                    .menu-toggle {
+                        display: block;
+                    }
+                }
                 /* Formularios y Tablas */
                 .form-container { max-width: 48rem; margin: auto; }
                 .form-grid { display: grid; grid-template-columns: repeat(1, 1fr); gap: 1.5rem; }
@@ -753,8 +797,17 @@ const App = () => {
                 .loading-screen { display: flex; justify-content: center; align-items: center; height: 100vh; font-size: 1.25rem; color: #14532d; }
             `}</style>
             <div className="app-container">
-                <Sidebar onSelect={setActiveSection} activeSection={activeSection} user={user} />
+                <Sidebar
+                    onSelect={setActiveSection}
+                    activeSection={activeSection}
+                    user={user}
+                    open={sidebarOpen}
+                    onClose={() => setSidebarOpen(false)}
+                />
                 <main className="main-content">
+                    <button className="menu-toggle" onClick={() => setSidebarOpen(!sidebarOpen)}>
+                        <i className="fas fa-bars"></i>
+                    </button>
                     {renderContent()}
                 </main>
             </div>
