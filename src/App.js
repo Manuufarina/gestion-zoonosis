@@ -682,7 +682,7 @@ const App = () => {
     };
 
     const handleLogin = (email, password) => {
-        if (email === 'admin' && password === 'si2025') {
+        if (email === 'mfserra@sanisidro.gob.ar' && password === 'si2025') {
             setUser({ uid: 'local-admin', nombre: 'Admin', rol: 'Admin' });
             return Promise.resolve();
         }
