@@ -19,6 +19,10 @@ cp .env.example .env
 
 Luego edite `.env` y coloque los valores proporcionados por Firebase.
 
+### Usuario administrador
+- Usuario: `admin`
+- Contraseña: `si2025`
+
 ## Available Scripts
 
 Dentro del directorio del proyecto se puede ejecutar:
