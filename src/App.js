@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 // --- CONFIGURACIÓN E INICIALIZACIÓN DE FIREBASE ---
 // Se integra directamente para evitar errores de importación.
 import { onAuthStateChanged } from 'firebase/auth';
-import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, Timestamp, collectionGroup, where, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, Timestamp, collectionGroup, where, getDocs, orderBy, limit } from 'firebase/firestore';
 import { jsPDF } from 'jspdf';
 import { auth, db } from './firebase';
 import { logUserAction } from './logger';
@@ -51,6 +51,7 @@ const Sidebar = ({ onSelect, activeSection, user, open, onClose }) => {
                     <div className="sidebar-section-divider">
                         <p className="sidebar-section-title">Administración</p>
                         <SidebarLink icon="fa-user-shield" text="Gestión de Usuarios" section="usuarios" activeSection={activeSection} onSelect={handleSelect} />
+                        <SidebarLink icon="fa-file-alt" text="Logs" section="logs" activeSection={activeSection} onSelect={handleSelect} />
                     </div>
                 )}
             </nav>
@@ -501,7 +502,8 @@ const Stock = () => {
 
 const Usuarios = () => {
     const [usuarios, setUsuarios] = useState([]);
-    const [formData, setFormData] = useState({ nombre: '', email: '', rol: 'Operador' });
+    const permissionOptions = ['dashboard','vecinos','stock','reportes','usuarios','logs'];
+    const [formData, setFormData] = useState({ nombre: '', email: '', rol: 'Operador', permisos: [] });
 
     useEffect(() => {
         const unsub = onSnapshot(collection(db, 'usuarios'), snap => {
@@ -511,13 +513,21 @@ const Usuarios = () => {
     }, []);
 
     const handleChange = e => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    const togglePermiso = p => {
+        setFormData(prev => {
+            const permisos = prev.permisos.includes(p)
+                ? prev.permisos.filter(per => per !== p)
+                : [...prev.permisos, p];
+            return { ...prev, permisos };
+        });
+    };
 
     const handleSubmit = async e => {
         e.preventDefault();
         try {
             const docRef = await addDoc(collection(db, 'usuarios'), formData);
             logUserAction(auth.currentUser?.uid, 'crear usuario', { id: docRef.id });
-            setFormData({ nombre: '', email: '', rol: 'Operador' });
+            setFormData({ nombre: '', email: '', rol: 'Operador', permisos: [] });
         } catch (err) {
             console.error('Error creando usuario', err);
         }
@@ -532,6 +542,16 @@ const Usuarios = () => {
                         <div className="form-field"><label>Nombre</label><input name="nombre" value={formData.nombre} onChange={handleChange} required /></div>
                         <div className="form-field"><label>Email</label><input name="email" value={formData.email} onChange={handleChange} required /></div>
                         <div className="form-field"><label>Rol</label><select name="rol" value={formData.rol} onChange={handleChange}><option>Operador</option><option>Admin</option></select></div>
+                        <div className="form-field full-width">
+                            <label>Permisos</label>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                                {permissionOptions.map(p => (
+                                    <label key={p} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                        <input type="checkbox" checked={formData.permisos.includes(p)} onChange={() => togglePermiso(p)} /> {p}
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
                     </div>
                     <div className="form-actions">
                         <button type="submit" className="button button-primary">Crear Usuario</button>
@@ -540,10 +560,43 @@ const Usuarios = () => {
             </div>
             <div className="card" style={{ marginTop: '1rem' }}>
                 <table className="table">
-                    <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th></tr></thead>
+                    <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Permisos</th></tr></thead>
                     <tbody>
                         {usuarios.map(u => (
-                            <tr key={u.id}><td>{u.nombre}</td><td>{u.email}</td><td>{u.rol}</td></tr>
+                            <tr key={u.id}><td>{u.nombre}</td><td>{u.email}</td><td>{u.rol}</td><td>{(u.permisos || []).join(', ')}</td></tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    );
+};
+
+const Logs = () => {
+    const [logs, setLogs] = useState([]);
+
+    useEffect(() => {
+        const q = query(collection(db, 'logs'), orderBy('fecha', 'desc'), limit(100));
+        const unsub = onSnapshot(q, snap => {
+            setLogs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        });
+        return () => unsub();
+    }, []);
+
+    return (
+        <section>
+            <h2 className="section-title">Logs de Movimientos</h2>
+            <div className="card">
+                <table className="table">
+                    <thead><tr><th>Fecha</th><th>Usuario</th><th>Acción</th><th>Detalles</th></tr></thead>
+                    <tbody>
+                        {logs.map(l => (
+                            <tr key={l.id}>
+                                <td>{l.fecha.toDate().toLocaleString()}</td>
+                                <td>{l.uid}</td>
+                                <td>{l.accion}</td>
+                                <td>{JSON.stringify(l.detalles)}</td>
+                            </tr>
                         ))}
                     </tbody>
                 </table>
@@ -678,6 +731,7 @@ const App = () => {
             case 'certificado': return <CertificadoVacunacion vecino={selectedVecino} mascota={selectedMascota} onBack={() => setActiveSection('mascotaDetail')} />;
             case 'stock': return <Stock />;
             case 'usuarios': return <Usuarios />;
+            case 'logs': return <Logs />;
             case 'reportes': return <Reportes />;
             default:
                 return <Dashboard goToVecinos={goToVecinos} goToStock={goToStock} stats={{ vecinos: kpiVecinos, mascotas: kpiMascotas, atenciones: kpiAtenciones }} />;
