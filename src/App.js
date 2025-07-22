@@ -412,7 +412,7 @@ const CertificadoVacunacion = ({ vecino, mascota, onBack }) => {
     );
 };
 
-const Stock = () => {
+const Stock = ({ onShowForm }) => {
     const [insumos, setInsumos] = useState([]);
 
     useEffect(() => {
@@ -435,7 +435,9 @@ const Stock = () => {
         <section>
             <div className="header-actions">
                 <h2 className="section-title" style={{ marginBottom: 0 }}>Gestión de Stock</h2>
-                <button className="button button-primary"><i className="fas fa-plus"></i> Nuevo Insumo</button>
+                <button className="button button-primary" onClick={() => onShowForm('insumoForm', { mode: 'new' })}>
+                    <i className="fas fa-plus"></i> Nuevo Insumo
+                </button>
             </div>
             <div className="card">
                 <table className="table">
@@ -451,6 +453,54 @@ const Stock = () => {
                         ))}
                     </tbody>
                 </table>
+            </div>
+        </section>
+    );
+};
+
+const InsumoForm = ({ onBack }) => {
+    const [formData, setFormData] = useState({ nombre: '', stock: 0, min: 0 });
+
+    const handleChange = e => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+
+    const calcularEstado = (stock, min) => {
+        if (stock <= 0) return 'Crítico';
+        if (stock <= min) return 'Bajo';
+        return 'OK';
+    };
+
+    const handleSubmit = async e => {
+        e.preventDefault();
+        try {
+            const data = {
+                ...formData,
+                stock: Number(formData.stock),
+                min: Number(formData.min),
+                estado: calcularEstado(Number(formData.stock), Number(formData.min))
+            };
+            const docRef = await addDoc(collection(db, 'insumos'), data);
+            logUserAction(auth.currentUser?.uid, 'crear insumo', { id: docRef.id });
+            onBack();
+        } catch (err) {
+            console.error('Error creando insumo', err);
+        }
+    };
+
+    return (
+        <section>
+            <h2 className="section-title">Registrar Insumo</h2>
+            <div className="card form-container">
+                <form onSubmit={handleSubmit}>
+                    <div className="form-grid">
+                        <div className="form-field"><label>Nombre</label><input name="nombre" value={formData.nombre} onChange={handleChange} required /></div>
+                        <div className="form-field"><label>Stock</label><input type="number" name="stock" value={formData.stock} onChange={handleChange} required /></div>
+                        <div className="form-field"><label>Stock Mínimo</label><input type="number" name="min" value={formData.min} onChange={handleChange} required /></div>
+                    </div>
+                    <div className="form-actions">
+                        <button type="button" className="button button-secondary" onClick={onBack}>Cancelar</button>
+                        <button type="submit" className="button button-primary">Guardar Insumo</button>
+                    </div>
+                </form>
             </div>
         </section>
     );
@@ -703,7 +753,8 @@ const App = () => {
             case 'mascotaDetail': return <MascotaDetail mascota={selectedMascota} vecino={selectedVecino} onBack={handleBackToVecinoDetail} onShowForm={handleShowForm} />;
             case 'atencionForm': return <AtencionForm onBack={() => setActiveSection('mascotaDetail')} vecinoId={formState.vecinoId} mascotaId={formState.mascotaId} />;
             case 'certificado': return <CertificadoVacunacion vecino={selectedVecino} mascota={selectedMascota} onBack={() => setActiveSection('mascotaDetail')} />;
-            case 'stock': return <Stock />;
+            case 'stock': return <Stock onShowForm={handleShowForm} />;
+            case 'insumoForm': return <InsumoForm onBack={() => setActiveSection('stock')} />;
             case 'usuarios': return <Usuarios />;
             case 'logs': return <Logs />;
             case 'reportes': return <Reportes />;
