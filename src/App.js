@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 // --- CONFIGURACIÓN E INICIALIZACIÓN DE FIREBASE ---
 // Se integra directamente para evitar errores de importación.
 import { onAuthStateChanged } from 'firebase/auth';
-import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, Timestamp } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, Timestamp, collectionGroup } from 'firebase/firestore';
 import { auth, db } from './firebase';
 
 
@@ -76,11 +76,17 @@ const SidebarLink = ({ icon, text, section, activeSection, onSelect }) => {
 
 // --- COMPONENTES DE SECCIONES ---
 
-const Dashboard = () => (
+const Dashboard = ({ goToVecinos, goToStock, stats }) => (
     <section>
         <h2 className="section-title">Dashboard</h2>
-        <div className="card">
-            <p>Bienvenido al sistema de gestión de Zoonosis. Seleccione una opción del menú para comenzar.</p>
+        <div className="quick-actions mb-6">
+            <button type="button" className="button button-primary" onClick={goToVecinos}><i className="fas fa-users"></i> Vecinos</button>
+            <button type="button" className="button button-primary" onClick={goToStock}><i className="fas fa-boxes-stacked"></i> Stock</button>
+        </div>
+        <div className="kpi-grid">
+            <div className="card kpi-card"><h3>Vecinos</h3><p>{stats.vecinos}</p></div>
+            <div className="card kpi-card"><h3>Mascotas</h3><p>{stats.mascotas}</p></div>
+            <div className="card kpi-card"><h3>Atenciones</h3><p>{stats.atenciones}</p></div>
         </div>
     </section>
 );
@@ -88,6 +94,7 @@ const Dashboard = () => (
 const VecinosList = ({ onSelectVecino, onShowForm }) => {
     const [vecinos, setVecinos] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [search, setSearch] = useState('');
 
     useEffect(() => {
         const q = query(collection(db, "vecinos"));
@@ -102,26 +109,33 @@ const VecinosList = ({ onSelectVecino, onShowForm }) => {
         return () => unsubscribe();
     }, []);
 
+
     if (loading) return <div className="card">Cargando vecinos...</div>;
 
     return (
         <section>
             <div className="header-actions">
                 <h2 className="section-title" style={{ marginBottom: 0 }}>Vecinos y Mascotas</h2>
-                <button className="button button-primary" onClick={() => onShowForm('vecinoForm', { mode: 'new' })}>
-                    <i className="fas fa-plus"></i> Nuevo Vecino
-                </button>
+                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                    <input type="text" placeholder="Buscar" value={search} onChange={(e) => setSearch(e.target.value)} />
+                    <button type="button" className="button button-primary" onClick={() => onShowForm('vecinoForm', { mode: 'new' })}>
+                        <i className="fas fa-plus"></i> Nuevo Vecino
+                    </button>
+                </div>
             </div>
             <div className="card">
                 <table className="table">
                     <thead><tr><th>Nombre y Apellido</th><th>DNI</th><th>Email</th><th style={{ textAlign: 'center' }}>Acciones</th></tr></thead>
                     <tbody>
-                        {vecinos.length > 0 ? vecinos.map(vecino => (
+                        {vecinos.length > 0 ? vecinos.filter(v =>
+                            `${v.nombre} ${v.apellido}`.toLowerCase().includes(search.toLowerCase()) ||
+                            v.dni.includes(search)
+                        ).map(vecino => (
                             <tr key={vecino.id}>
                                 <td>{vecino.nombre} {vecino.apellido}</td>
                                 <td>{vecino.dni}</td>
                                 <td>{vecino.email}</td>
-                                <td style={{ textAlign: 'center' }}><button className="button-link" onClick={() => onSelectVecino(vecino)}><i className="fas fa-eye"></i> Ver Ficha</button></td>
+                                <td style={{ textAlign: 'center' }}><button type="button" className="button-link" onClick={() => onSelectVecino(vecino)}><i className="fas fa-eye"></i> Ver Ficha</button></td>
                             </tr>
                         )) : (<tr><td colSpan="4">No hay vecinos registrados.</td></tr>)}
                     </tbody>
@@ -175,6 +189,7 @@ const VecinoDetail = ({ vecino, onEditVecino, onShowForm, onDeleteVecino, onSele
     const [mascotas, setMascotas] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [searchMascota, setSearchMascota] = useState('');
 
     useEffect(() => {
         if (!vecino) return;
@@ -213,17 +228,23 @@ const VecinoDetail = ({ vecino, onEditVecino, onShowForm, onDeleteVecino, onSele
             </div>
             <div className="header-actions">
                 <h3 className="section-subtitle">Mascotas Registradas</h3>
-                <button className="button button-primary" onClick={() => onShowForm('mascotaForm', { mode: 'new', vecinoId: vecino.id })}><i className="fas fa-plus"></i> Nueva Mascota</button>
+                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                    <input type="text" placeholder="Buscar" value={searchMascota} onChange={(e) => setSearchMascota(e.target.value)} />
+                    <button type="button" className="button button-primary" onClick={() => onShowForm('mascotaForm', { mode: 'new', vecinoId: vecino.id })}><i className="fas fa-plus"></i> Nueva Mascota</button>
+                </div>
             </div>
             <div className="card">
                  <table className="table">
                     <thead><tr><th>Nombre</th><th>Especie</th><th>Raza</th><th style={{ textAlign: 'center' }}>Acciones</th></tr></thead>
                     <tbody>
                         {loading ? (<tr><td colSpan="4">Cargando mascotas...</td></tr>) 
-                        : mascotas.length > 0 ? mascotas.map(mascota => (
+                        : mascotas.length > 0 ? mascotas.filter(m =>
+                            m.nombre.toLowerCase().includes(searchMascota.toLowerCase()) ||
+                            m.raza.toLowerCase().includes(searchMascota.toLowerCase())
+                        ).map(mascota => (
                             <tr key={mascota.id}>
                                 <td>{mascota.nombre}</td><td>{mascota.especie}</td><td>{mascota.raza}</td>
-                                <td style={{ textAlign: 'center' }}><button className="button-link" onClick={() => onSelectMascota(mascota)}><i className="fas fa-file-medical"></i> Ver Historial</button></td>
+                                <td style={{ textAlign: 'center' }}><button type="button" className="button-link" onClick={() => onSelectMascota(mascota)}><i className="fas fa-file-medical"></i> Ver Historial</button></td>
                             </tr>
                         )) : (<tr><td colSpan="4">Este vecino no tiene mascotas registradas.</td></tr>)}
                     </tbody>
@@ -294,7 +315,7 @@ const MascotaDetail = ({ mascota, vecino, onBack, onShowForm }) => {
 
     return (
         <section>
-            <button className="button-link mb-6" onClick={onBack}><i className="fas fa-arrow-left"></i> Volver a la Ficha del Vecino</button>
+            <button type="button" className="button-link mb-6" onClick={onBack}><i className="fas fa-arrow-left"></i> Volver a la Ficha del Vecino</button>
             <div className="header-actions">
                 <h2 className="section-title" style={{ marginBottom: 0 }}>Historial de {mascota.nombre}</h2>
                 <button className="button button-primary" onClick={() => onShowForm('atencionForm', { mode: 'new', mascotaId: mascota.id, vecinoId: vecino.id })}>
@@ -408,6 +429,9 @@ const App = () => {
     const [selectedVecino, setSelectedVecino] = useState(null);
     const [selectedMascota, setSelectedMascota] = useState(null);
     const [formState, setFormState] = useState({ mode: 'new', data: null });
+    const [kpiVecinos, setKpiVecinos] = useState(0);
+    const [kpiMascotas, setKpiMascotas] = useState(0);
+    const [kpiAtenciones, setKpiAtenciones] = useState(0);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
@@ -415,6 +439,17 @@ const App = () => {
             setLoading(false);
         });
         return () => unsubscribe();
+    }, []);
+
+    useEffect(() => {
+        const unsubVecinos = onSnapshot(collection(db, 'vecinos'), snap => setKpiVecinos(snap.size));
+        const unsubMascotas = onSnapshot(collectionGroup(db, 'mascotas'), snap => setKpiMascotas(snap.size));
+        const unsubAtenciones = onSnapshot(collectionGroup(db, 'atenciones'), snap => setKpiAtenciones(snap.size));
+        return () => {
+            unsubVecinos();
+            unsubMascotas();
+            unsubAtenciones();
+        };
     }, []);
 
     const handleShowForm = (section, state = { mode: 'new' }) => {
@@ -442,11 +477,15 @@ const App = () => {
         setActiveSection('vecinoDetail');
     }
 
+    const goToVecinos = () => setActiveSection('vecinosList');
+    const goToStock = () => setActiveSection('stock');
+
     if (loading) return <div className="loading-screen">Cargando aplicación...</div>;
 
     const renderContent = () => {
         switch (activeSection) {
-            case 'dashboard': return <Dashboard />;
+            case 'dashboard':
+                return <Dashboard goToVecinos={goToVecinos} goToStock={goToStock} stats={{ vecinos: kpiVecinos, mascotas: kpiMascotas, atenciones: kpiAtenciones }} />;
             case 'vecinosList': return <VecinosList onSelectVecino={handleSelectVecino} onShowForm={handleShowForm} />;
             case 'vecinoForm': return <VecinoForm onBack={handleBackToVecinosList} currentVecino={formState.mode === 'edit' ? formState.data : null} />;
             case 'vecinoDetail': return <VecinoDetail vecino={selectedVecino} onEditVecino={(v) => handleShowForm('vecinoForm', { mode: 'edit', data: v })} onShowForm={handleShowForm} onDeleteVecino={handleBackToVecinosList} onSelectMascota={handleSelectMascota} />;
@@ -454,7 +493,8 @@ const App = () => {
             case 'mascotaDetail': return <MascotaDetail mascota={selectedMascota} vecino={selectedVecino} onBack={handleBackToVecinoDetail} onShowForm={handleShowForm} />;
             case 'atencionForm': return <AtencionForm onBack={() => setActiveSection('mascotaDetail')} vecinoId={formState.vecinoId} mascotaId={formState.mascotaId} />;
             case 'stock': return <Stock />;
-            default: return <Dashboard />;
+            default:
+                return <Dashboard goToVecinos={goToVecinos} goToStock={goToStock} stats={{ vecinos: kpiVecinos, mascotas: kpiMascotas, atenciones: kpiAtenciones }} />;
         }
     };
 
@@ -516,6 +556,9 @@ const App = () => {
                 .table th { font-weight: 700; }
                 .table tbody tr { border-bottom: 1px solid #e5e7eb; }
                 .header-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+                .quick-actions { display: flex; gap: 1rem; margin-bottom: 1rem; }
+                .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1rem; }
+                .kpi-card { text-align: center; }
                 /* Detalles */
                 .vecino-detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; }
                 /* Atenciones */
