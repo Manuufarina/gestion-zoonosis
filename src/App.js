@@ -3,7 +3,8 @@ import React, { useState, useEffect } from 'react';
 // --- CONFIGURACIÓN E INICIALIZACIÓN DE FIREBASE ---
 // Se integra directamente para evitar errores de importación.
 import { onAuthStateChanged } from 'firebase/auth';
-import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, Timestamp, collectionGroup } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, Timestamp, collectionGroup, where } from 'firebase/firestore';
+import { jsPDF } from 'jspdf';
 import { auth, db } from './firebase';
 
 
@@ -321,6 +322,9 @@ const MascotaDetail = ({ mascota, vecino, onBack, onShowForm }) => {
                 <button className="button button-primary" onClick={() => onShowForm('atencionForm', { mode: 'new', mascotaId: mascota.id, vecinoId: vecino.id })}>
                     <i className="fas fa-plus"></i> Nueva Atención
                 </button>
+                <button className="button button-primary" onClick={() => onShowForm('certificado', { mascotaId: mascota.id, vecinoId: vecino.id })}>
+                    <i className="fas fa-file-pdf"></i> Certificado Vacunación
+                </button>
             </div>
             <div className="card">
                 {loading ? <p>Cargando historial...</p> : atenciones.length > 0 ? (
@@ -374,6 +378,64 @@ const AtencionForm = ({ onBack, mascotaId, vecinoId }) => {
                         <button type="submit" className="button button-primary">Guardar Atención</button>
                     </div>
                 </form>
+            </div>
+        </section>
+    );
+};
+
+const CertificadoVacunacion = ({ vecino, mascota, onBack }) => {
+    const [vacunas, setVacunas] = useState([]);
+
+    useEffect(() => {
+        if (!vecino || !mascota) return;
+        const q = query(
+            collection(db, `vecinos/${vecino.id}/mascotas/${mascota.id}/atenciones`),
+            where('tipo', '==', 'Vacunación')
+        );
+        const unsub = onSnapshot(q, snap => {
+            setVacunas(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        });
+        return () => unsub();
+    }, [vecino, mascota]);
+
+    const enviarPDF = () => {
+        const doc = new jsPDF();
+        doc.setFontSize(16);
+        doc.text('Certificado de Vacunación', 105, 20, { align: 'center' });
+        doc.setFontSize(12);
+        doc.text(`Dueño: ${vecino.nombre} ${vecino.apellido}`, 20, 40);
+        doc.text(`Domicilio: ${vecino.domicilio}`, 20, 48);
+        doc.text(`Mascota: ${mascota.nombre} - ${mascota.especie} ${mascota.raza}`, 20, 56);
+        doc.text('Vacunas Aplicadas:', 20, 68);
+        vacunas.forEach((v, i) => {
+            const y = 76 + i * 8;
+            const fecha = v.fecha.toDate().toLocaleDateString();
+            doc.text(`${i + 1}. ${v.motivo} - ${fecha} (${v.sede})`, 26, y);
+        });
+        doc.save('certificado.pdf');
+        alert('Certificado enviado por correo (simulado)');
+    };
+
+    return (
+        <section>
+            <button type="button" className="button-link mb-6" onClick={onBack}><i className="fas fa-arrow-left"></i> Volver</button>
+            <h2 className="section-title">Certificado de Vacunación</h2>
+            <div className="card">
+                <p><strong>Dueño:</strong> {vecino.nombre} {vecino.apellido}</p>
+                <p><strong>Domicilio:</strong> {vecino.domicilio}</p>
+                <p><strong>Mascota:</strong> {mascota.nombre} - {mascota.especie} {mascota.raza}</p>
+                <h3 className="section-subtitle">Vacunas Aplicadas</h3>
+                {vacunas.length > 0 ? (
+                    <ul>
+                        {vacunas.map(v => (
+                            <li key={v.id}>{v.motivo} - {v.fecha.toDate().toLocaleDateString()} ({v.sede})</li>
+                        ))}
+                    </ul>
+                ) : <p>No hay registros de vacunación.</p>}
+                <div className="form-actions" style={{justifyContent: 'flex-end'}}>
+                    <button type="button" className="button button-secondary" onClick={onBack}>Cerrar</button>
+                    <button type="button" className="button button-primary" onClick={enviarPDF}><i className="fas fa-envelope"></i> Enviar por Email</button>
+                </div>
             </div>
         </section>
     );
@@ -492,6 +554,7 @@ const App = () => {
             case 'mascotaForm': return <MascotaForm onBack={() => setActiveSection('vecinoDetail')} vecinoId={selectedVecino?.id} currentMascota={formState.mode === 'edit' ? formState.data : null} />;
             case 'mascotaDetail': return <MascotaDetail mascota={selectedMascota} vecino={selectedVecino} onBack={handleBackToVecinoDetail} onShowForm={handleShowForm} />;
             case 'atencionForm': return <AtencionForm onBack={() => setActiveSection('mascotaDetail')} vecinoId={formState.vecinoId} mascotaId={formState.mascotaId} />;
+            case 'certificado': return <CertificadoVacunacion vecino={selectedVecino} mascota={selectedMascota} onBack={() => setActiveSection('mascotaDetail')} />;
             case 'stock': return <Stock />;
             default:
                 return <Dashboard goToVecinos={goToVecinos} goToStock={goToStock} stats={{ vecinos: kpiVecinos, mascotas: kpiMascotas, atenciones: kpiAtenciones }} />;
