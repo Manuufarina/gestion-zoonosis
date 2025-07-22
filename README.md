@@ -20,7 +20,7 @@ cp .env.example .env
 Luego edite `.env` y coloque los valores proporcionados por Firebase.
 
 ### Usuario administrador
-- Usuario: `admin`
+- Usuario: `mfserra@sanisidro.gob.ar`
 - Contraseña: `si2025`
 
 ## Available Scripts
