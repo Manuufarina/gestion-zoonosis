@@ -7,6 +7,9 @@ import Login from './components/Login';
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, Timestamp, collectionGroup, where, getDocs, orderBy, limit } from 'firebase/firestore';
 import { jsPDF } from 'jspdf';
+import { Pie, Bar } from 'react-chartjs-2';
+import { Chart as ChartJS, ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend } from 'chart.js';
+ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 import { auth, db } from './firebase';
 import { logUserAction } from './logger';
 
@@ -35,20 +38,120 @@ const Modal = ({ show, onClose, onConfirm, title, children }) => {
 
 // --- COMPONENTES DE SECCIONES ---
 
-const Dashboard = ({ goToVecinos, goToStock, stats }) => (
-    <section>
-        <h2 className="section-title">Dashboard</h2>
-        <div className="quick-actions mb-6">
-            <button type="button" className="button button-primary" onClick={goToVecinos}><i className="fas fa-users"></i> Vecinos</button>
-            <button type="button" className="button button-primary" onClick={goToStock}><i className="fas fa-boxes-stacked"></i> Stock</button>
-        </div>
-        <div className="kpi-grid">
-            <div className="card kpi-card"><h3>Vecinos</h3><p>{stats.vecinos}</p></div>
-            <div className="card kpi-card"><h3>Mascotas</h3><p>{stats.mascotas}</p></div>
-            <div className="card kpi-card"><h3>Atenciones</h3><p>{stats.atenciones}</p></div>
-        </div>
-    </section>
-);
+const Dashboard = ({ goToVecinos, goToStock, stats, onNewMascota, onNewAtencion }) => {
+    const [dniMascota, setDniMascota] = useState('');
+    const [dniAtencion, setDniAtencion] = useState('');
+    const [mascotasAtencion, setMascotasAtencion] = useState([]);
+    const [mascotaSeleccionada, setMascotaSeleccionada] = useState('');
+    const [datosTipos, setDatosTipos] = useState([]);
+    const [datosEspecies, setDatosEspecies] = useState([]);
+
+    const buscarVecinoPorDni = async (dni) => {
+        const q = query(collection(db, 'vecinos'), where('dni', '==', dni));
+        const snap = await getDocs(q);
+        if (snap.empty) return null;
+        const d = snap.docs[0];
+        return { id: d.id, ...d.data() };
+    };
+
+    const handleNuevaMascota = async (e) => {
+        e.preventDefault();
+        const vecino = await buscarVecinoPorDni(dniMascota);
+        if (!vecino) { alert('Vecino no encontrado'); return; }
+        onNewMascota(vecino);
+        setDniMascota('');
+    };
+
+    const handleBuscarMascotas = async (e) => {
+        e.preventDefault();
+        const vecino = await buscarVecinoPorDni(dniAtencion);
+        if (!vecino) { alert('Vecino no encontrado'); return; }
+        const snap = await getDocs(collection(db, `vecinos/${vecino.id}/mascotas`));
+        setMascotasAtencion(snap.docs.map(d => ({ id: d.id, ...d.data(), vecinoId: vecino.id, vecino })));
+    };
+
+    const handleNuevaAtencion = () => {
+        const mascota = mascotasAtencion.find(m => m.id === mascotaSeleccionada);
+        if (mascota) onNewAtencion(mascota.vecinoId, mascota.id, mascota.vecino);
+    };
+
+    useEffect(() => {
+        const now = new Date();
+        const start = new Date(now.getFullYear(), now.getMonth(), 1);
+        const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+        const qAt = query(
+            collectionGroup(db, 'atenciones'),
+            where('fecha', '>=', Timestamp.fromDate(start)),
+            where('fecha', '<=', Timestamp.fromDate(end))
+        );
+        getDocs(qAt).then(snap => {
+            const tipos = {};
+            snap.forEach(d => { const t = d.data().tipo; tipos[t] = (tipos[t] || 0) + 1; });
+            setDatosTipos(Object.entries(tipos));
+        });
+        getDocs(collectionGroup(db, 'mascotas')).then(snap => {
+            const esp = {};
+            snap.forEach(d => { const e = d.data().especie; esp[e] = (esp[e] || 0) + 1; });
+            setDatosEspecies(Object.entries(esp));
+        });
+    }, []);
+
+    return (
+        <section>
+            <h2 className="section-title">Dashboard</h2>
+            <div className="quick-actions mb-6">
+                <button type="button" className="button button-primary" onClick={goToVecinos}><i className="fas fa-users"></i> Vecinos</button>
+                <button type="button" className="button button-primary" onClick={goToStock}><i className="fas fa-boxes-stacked"></i> Stock</button>
+            </div>
+            <div className="kpi-grid">
+                <div className="card kpi-card"><h3>Vecinos</h3><p>{stats.vecinos}</p></div>
+                <div className="card kpi-card"><h3>Mascotas</h3><p>{stats.mascotas}</p></div>
+                <div className="card kpi-card"><h3>Atenciones</h3><p>{stats.atenciones}</p></div>
+            </div>
+            {(datosTipos.length > 0 || datosEspecies.length > 0) && (
+                <div className="kpi-grid" style={{ marginTop: '2rem' }}>
+                    {datosTipos.length > 0 && (
+                        <div className="card">
+                            <Bar data={{
+                                labels: datosTipos.map(t => t[0]),
+                                datasets: [{ label: 'Atenciones Mes', data: datosTipos.map(t => t[1]), backgroundColor: '#4ade80' }]
+                            }} />
+                        </div>
+                    )}
+                    {datosEspecies.length > 0 && (
+                        <div className="card">
+                            <Pie data={{
+                                labels: datosEspecies.map(e => e[0]),
+                                datasets: [{ data: datosEspecies.map(e => e[1]), backgroundColor: ['#60a5fa','#fbbf24'] }]
+                            }} />
+                        </div>
+                    )}
+                </div>
+            )}
+            <div className="quick-actions" style={{ marginTop: '2rem', flexDirection: 'column', gap: '1rem' }}>
+                <form onSubmit={handleNuevaMascota} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <input placeholder="DNI vecino" value={dniMascota} onChange={e => setDniMascota(e.target.value)} />
+                    <button type="submit" className="button button-primary">Nueva Mascota</button>
+                </form>
+                <form onSubmit={handleBuscarMascotas} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <input placeholder="DNI vecino" value={dniAtencion} onChange={e => setDniAtencion(e.target.value)} />
+                    <button type="submit" className="button button-primary">Buscar Mascotas</button>
+                </form>
+                {mascotasAtencion.length > 0 && (
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                        <select value={mascotaSeleccionada} onChange={e => setMascotaSeleccionada(e.target.value)}>
+                            <option value="">Seleccione Mascota</option>
+                            {mascotasAtencion.map(m => (
+                                <option key={m.id} value={m.id}>{m.nombre}</option>
+                            ))}
+                        </select>
+                        <button type="button" className="button button-primary" onClick={handleNuevaAtencion}>Nueva Atención</button>
+                    </div>
+                )}
+            </div>
+        </section>
+    );
+};
 
 const VecinosList = ({ onSelectVecino, onShowForm }) => {
     const [vecinos, setVecinos] = useState([]);
@@ -308,6 +411,7 @@ const MascotaDetail = ({ mascota, vecino, onBack, onShowForm }) => {
                                     <span className="atencion-date">{atencion.fecha.toDate().toLocaleDateString()} - {atencion.sede}</span>
                                 </div>
                                 <p><strong>Motivo:</strong> {atencion.motivo}</p>
+                                <p><strong>Veterinario:</strong> {atencion.veterinario}</p>
                                 <p><strong>Observaciones:</strong> {atencion.observaciones}</p>
                             </div>
                         ))}
@@ -320,7 +424,7 @@ const MascotaDetail = ({ mascota, vecino, onBack, onShowForm }) => {
 
 const AtencionForm = ({ onBack, mascotaId, vecinoId }) => {
     const [formData, setFormData] = useState({
-        fecha: Timestamp.now(), sede: 'Sede Central', tipo: 'Clínica', motivo: '', observaciones: ''
+        fecha: Timestamp.now(), sede: 'Sede Central', tipo: 'Clínica', motivo: '', veterinario: '', observaciones: ''
     });
 
     const handleChange = (e) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -344,6 +448,7 @@ const AtencionForm = ({ onBack, mascotaId, vecinoId }) => {
                         <div className="form-field"><label>Sede</label><select name="sede" value={formData.sede} onChange={handleChange}><option>Sede Central</option><option>Quirófano Móvil</option></select></div>
                         <div className="form-field"><label>Tipo de Atención</label><select name="tipo" value={formData.tipo} onChange={handleChange}><option>Clínica</option><option>Vacunación</option><option>Castración</option></select></div>
                         <div className="form-field full-width"><label>Motivo / Diagnóstico</label><input name="motivo" value={formData.motivo} onChange={handleChange} required /></div>
+                        <div className="form-field"><label>Veterinario</label><input name="veterinario" value={formData.veterinario} onChange={handleChange} required /></div>
                         <div className="form-field full-width"><label>Observaciones y Recomendaciones</label><textarea name="observaciones" value={formData.observaciones} onChange={handleChange} rows="4"></textarea></div>
                     </div>
                     <div className="form-actions">
@@ -388,7 +493,9 @@ const CertificadoVacunacion = ({ vecino, mascota, onBack }) => {
         vacunas.forEach((v, i) => {
             const y = 66 + i * 8;
             const fecha = v.fecha.toDate().toLocaleDateString();
-            doc.text(`${i + 1}. ${v.motivo} - ${fecha} (${v.sede})`, 26, y);
+            doc.text(`${i + 1}. ${v.motivo} - ${fecha} (${v.sede}) - Vet: ${v.veterinario || ''}`,
+                26,
+                y);
         });
         doc.save('certificado.pdf');
         alert('Certificado enviado por correo (simulado)');
@@ -406,7 +513,7 @@ const CertificadoVacunacion = ({ vecino, mascota, onBack }) => {
                 {vacunas.length > 0 ? (
                     <ul>
                         {vacunas.map(v => (
-                            <li key={v.id}>{v.motivo} - {v.fecha.toDate().toLocaleDateString()} ({v.sede})</li>
+                            <li key={v.id}>{v.motivo} - {v.fecha.toDate().toLocaleDateString()} ({v.sede}) - Vet: {v.veterinario || ''}</li>
                         ))}
                     </ul>
                 ) : <p>No hay registros de vacunación.</p>}
@@ -606,7 +713,7 @@ const Logs = () => {
                     <tbody>
                         {logs.map(l => (
                             <tr key={l.id}>
-                                <td>{l.fecha.toDate().toLocaleString()}</td>
+                                <td>{l.fecha ? l.fecha.toDate().toLocaleString() : ''}</td>
                                 <td>{l.uid}</td>
                                 <td>{l.accion}</td>
                                 <td>{JSON.stringify(l.detalles)}</td>
@@ -735,6 +842,19 @@ const App = () => {
         setActiveSection('vecinoDetail');
     }
 
+    const handleQuickMascota = (vecino) => {
+        setSelectedVecino(vecino);
+        setFormState({ mode: 'new', returnTo: 'dashboard' });
+        setActiveSection('mascotaForm');
+    };
+
+    const handleQuickAtencion = (vecinoId, mascotaId, vecino) => {
+        setSelectedVecino(vecino);
+        setSelectedMascota({ id: mascotaId });
+        setFormState({ mode: 'new', vecinoId, mascotaId, returnTo: 'dashboard' });
+        setActiveSection('atencionForm');
+    };
+
     const goToVecinos = () => setActiveSection('vecinosList');
     const goToStock = () => setActiveSection('stock');
 
@@ -761,13 +881,15 @@ const App = () => {
     const renderContent = () => {
         switch (activeSection) {
             case 'dashboard':
-                return <Dashboard goToVecinos={goToVecinos} goToStock={goToStock} stats={{ vecinos: kpiVecinos, mascotas: kpiMascotas, atenciones: kpiAtenciones }} />;
+                return <Dashboard goToVecinos={goToVecinos} goToStock={goToStock} stats={{ vecinos: kpiVecinos, mascotas: kpiMascotas, atenciones: kpiAtenciones }} onNewMascota={handleQuickMascota} onNewAtencion={handleQuickAtencion} />;
             case 'vecinosList': return <VecinosList onSelectVecino={handleSelectVecino} onShowForm={handleShowForm} />;
             case 'vecinoForm': return <VecinoForm onBack={handleBackToVecinosList} currentVecino={formState.mode === 'edit' ? formState.data : null} />;
             case 'vecinoDetail': return <VecinoDetail vecino={selectedVecino} onEditVecino={(v) => handleShowForm('vecinoForm', { mode: 'edit', data: v })} onShowForm={handleShowForm} onDeleteVecino={handleBackToVecinosList} onSelectMascota={handleSelectMascota} />;
-            case 'mascotaForm': return <MascotaForm onBack={() => setActiveSection('vecinoDetail')} vecinoId={selectedVecino?.id} currentMascota={formState.mode === 'edit' ? formState.data : null} />;
+            case 'mascotaForm':
+                return <MascotaForm onBack={() => setActiveSection(formState.returnTo || 'vecinoDetail')} vecinoId={selectedVecino?.id} currentMascota={formState.mode === 'edit' ? formState.data : null} />;
             case 'mascotaDetail': return <MascotaDetail mascota={selectedMascota} vecino={selectedVecino} onBack={handleBackToVecinoDetail} onShowForm={handleShowForm} />;
-            case 'atencionForm': return <AtencionForm onBack={() => setActiveSection('mascotaDetail')} vecinoId={formState.vecinoId} mascotaId={formState.mascotaId} />;
+            case 'atencionForm':
+                return <AtencionForm onBack={() => setActiveSection(formState.returnTo || 'mascotaDetail')} vecinoId={formState.vecinoId} mascotaId={formState.mascotaId} />;
             case 'certificado': return <CertificadoVacunacion vecino={selectedVecino} mascota={selectedMascota} onBack={() => setActiveSection('mascotaDetail')} />;
             case 'stock': return <Stock onShowForm={handleShowForm} />;
             case 'insumoForm': return <InsumoForm onBack={() => setActiveSection('stock')} />;
@@ -775,7 +897,7 @@ const App = () => {
             case 'logs': return <Logs />;
             case 'reportes': return <Reportes />;
             default:
-                return <Dashboard goToVecinos={goToVecinos} goToStock={goToStock} stats={{ vecinos: kpiVecinos, mascotas: kpiMascotas, atenciones: kpiAtenciones }} />;
+                return <Dashboard goToVecinos={goToVecinos} goToStock={goToStock} stats={{ vecinos: kpiVecinos, mascotas: kpiMascotas, atenciones: kpiAtenciones }} onNewMascota={handleQuickMascota} onNewAtencion={handleQuickAtencion} />;
         }
     };
 

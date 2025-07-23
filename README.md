@@ -5,7 +5,7 @@ Aplicación web creada con [Create React App](https://github.com/facebook/create
 ## Puesta en marcha
 
 1. Instale las dependencias con `npm install`.
-2. Copie `.env.example` a `.env` y complete las credenciales de Firebase.
+2. Copie `.env.example` a `.env` y complete las credenciales de Firebase de producción.
 3. Ejecute `npm start` para iniciar la versión de desarrollo.
 
 ### Variables de entorno
