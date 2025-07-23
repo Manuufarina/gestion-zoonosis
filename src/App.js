@@ -374,15 +374,19 @@ const CertificadoVacunacion = ({ vecino, mascota, onBack }) => {
 
     const enviarPDF = () => {
         const doc = new jsPDF();
+        doc.setFillColor(44, 122, 123);
+        doc.rect(0, 0, 210, 20, 'F');
+        doc.setTextColor(255, 255, 255);
         doc.setFontSize(16);
-        doc.text(CERT_TITLE, 105, 20, { align: 'center' });
+        doc.text(CERT_TITLE, 105, 12, { align: 'center' });
+        doc.setTextColor(0, 0, 0);
         doc.setFontSize(12);
-        doc.text(`Dueño: ${vecino.nombre} ${vecino.apellido}`, 20, 40);
-        doc.text(`Domicilio: ${vecino.domicilio}`, 20, 48);
-        doc.text(`Mascota: ${mascota.nombre} - ${mascota.especie} ${mascota.raza}`, 20, 56);
-        doc.text('Vacunas Aplicadas:', 20, 68);
+        doc.text(`Dueño: ${vecino.nombre} ${vecino.apellido}`, 20, 30);
+        doc.text(`Domicilio: ${vecino.domicilio}`, 20, 38);
+        doc.text(`Mascota: ${mascota.nombre} - ${mascota.especie} ${mascota.raza}`, 20, 46);
+        doc.text('Vacunas Aplicadas:', 20, 58);
         vacunas.forEach((v, i) => {
-            const y = 76 + i * 8;
+            const y = 66 + i * 8;
             const fecha = v.fecha.toDate().toLocaleDateString();
             doc.text(`${i + 1}. ${v.motivo} - ${fecha} (${v.sede})`, 26, y);
         });
@@ -630,10 +634,18 @@ const Reportes = () => {
         );
         const snap = await getDocs(q);
         const doc = new jsPDF();
-        doc.text('Reporte de Trabajos', 105, 20, { align: 'center' });
+        doc.setFillColor(44, 122, 123);
+        doc.rect(0, 0, 210, 20, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(16);
+        doc.text('Reporte de Trabajos', 105, 12, { align: 'center' });
+        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(12);
+        let y = 30;
         snap.docs.forEach((d, i) => {
             const a = d.data();
-            doc.text(`${i + 1}. ${a.tipo} - ${a.motivo} - ${a.sede} - ${a.fecha.toDate().toLocaleDateString()}`, 20, 40 + i * 8);
+            doc.text(`${i + 1}. ${a.tipo} - ${a.motivo} - ${a.sede} - ${a.fecha.toDate().toLocaleDateString()}`, 20, y);
+            y += 8;
         });
         doc.save('reporte.pdf');
         logUserAction(auth.currentUser?.uid, 'exportar reporte', { desde, hasta });
