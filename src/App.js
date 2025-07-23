@@ -853,9 +853,9 @@ const Usuarios = () => {
             <div className="card form-container">
                 <form onSubmit={handleSubmit}>
                     <div className="form-grid">
-                        <div className="form-field"><label>Nombre</label><input name="nombre" value={formData.nombre} onChange={handleChange} required /></div>
-                        <div className="form-field"><label>Email</label><input name="email" value={formData.email} onChange={handleChange} required /></div>
-                        <div className="form-field"><label>Contraseña</label><input type="password" name="password" value={formData.password} onChange={handleChange} required /></div>
+                        <div className="form-field"><label>Nombre</label><input name="nombre" autoComplete="name" value={formData.nombre} onChange={handleChange} required /></div>
+                        <div className="form-field"><label>Email</label><input name="email" type="email" autoComplete="email" value={formData.email} onChange={handleChange} required /></div>
+                        <div className="form-field"><label>Contraseña</label><input type="password" name="password" autoComplete="new-password" value={formData.password} onChange={handleChange} required /></div>
                         <div className="form-field"><label>Rol</label><select name="rol" value={formData.rol} onChange={handleChange}><option>Operador</option><option>Admin</option></select></div>
                         <div className="form-field full-width">
                             <label>Permisos</label>
