@@ -8,10 +8,11 @@ import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebas
 import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, Timestamp, collectionGroup, where, getDocs, orderBy, limit, increment } from 'firebase/firestore';
 import { jsPDF } from 'jspdf';
 import { Pie, Bar } from 'react-chartjs-2';
-import { Chart as ChartJS, ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend } from 'chart.js';
-ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 import { auth, db } from './firebase';
 import { logUserAction } from './logger';
+import { Chart as ChartJS, ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend } from 'chart.js';
+
+ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
 
 // --- COMPONENTES AUXILIARES ---
