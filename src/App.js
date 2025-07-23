@@ -5,13 +5,14 @@ import Login from './components/Login';
 // --- CONFIGURACIÓN E INICIALIZACIÓN DE FIREBASE ---
 // Se integra directamente para evitar errores de importación.
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
-import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, Timestamp, collectionGroup, where, getDocs, orderBy, limit } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, Timestamp, collectionGroup, where, getDocs, orderBy, limit, increment } from 'firebase/firestore';
 import { jsPDF } from 'jspdf';
 import { Pie, Bar } from 'react-chartjs-2';
-import { Chart as ChartJS, ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend } from 'chart.js';
-ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 import { auth, db } from './firebase';
 import { logUserAction } from './logger';
+import { Chart as ChartJS, ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend } from 'chart.js';
+
+ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
 
 // --- COMPONENTES AUXILIARES ---
@@ -215,11 +216,22 @@ const VecinosList = ({ onSelectVecino, onShowForm }) => {
 
 const VecinoForm = ({ onBack, currentVecino }) => {
     const isEditMode = !!currentVecino;
-    const [formData, setFormData] = useState({ nombre: '', apellido: '', dni: '', telefono: '', domicilio: '', email: '' });
+    const localidadesSI = ['Acassuso','Beccar','Boulogne','Mart\u00ednez','San Isidro','Villa Adelina'];
+    const defaultVecino = { nombre: '', apellido: '', dni: '', telefono: '', domicilio: '', email: '', localidad: localidadesSI[0], fueraSI: false };
+    const [formData, setFormData] = useState(defaultVecino);
 
-    useEffect(() => { if (isEditMode) setFormData(currentVecino); }, [currentVecino, isEditMode]);
+    useEffect(() => {
+        if (isEditMode) {
+            setFormData({ ...defaultVecino, ...currentVecino });
+        } else {
+            setFormData(defaultVecino);
+        }
+    }, [currentVecino, isEditMode]);
 
-    const handleChange = (e) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    const handleChange = (e) => {
+        const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+        setFormData(prev => ({ ...prev, [e.target.name]: value }));
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -246,6 +258,17 @@ const VecinoForm = ({ onBack, currentVecino }) => {
                         <div className="form-field"><label>Apellido</label><input name="apellido" value={formData.apellido} onChange={handleChange} required /></div>
                         <div className="form-field"><label>DNI</label><input name="dni" value={formData.dni} onChange={handleChange} required /></div>
                         <div className="form-field"><label>Teléfono</label><input name="telefono" value={formData.telefono} onChange={handleChange} /></div>
+                        <div className="form-field">
+                            <label>Localidad</label>
+                            <div style={{display:'flex',alignItems:'center',gap:'0.5rem'}}>
+                                <select name="localidad" value={formData.localidad} onChange={handleChange} disabled={formData.fueraSI}>
+                                    {localidadesSI.map(l => (<option key={l} value={l}>{l}</option>))}
+                                </select>
+                                <label style={{display:'flex',alignItems:'center',gap:'0.25rem'}}>
+                                    <input type="checkbox" name="fueraSI" checked={formData.fueraSI} onChange={handleChange} /> No es de San Isidro
+                                </label>
+                            </div>
+                        </div>
                         <div className="form-field full-width"><label>Domicilio</label><input name="domicilio" value={formData.domicilio} onChange={handleChange} required /></div>
                         <div className="form-field full-width"><label>Email</label><input type="email" name="email" value={formData.email} onChange={handleChange} required /></div>
                     </div>
@@ -432,15 +455,54 @@ const AtencionForm = ({ onBack, mascotaId, vecinoId }) => {
     const [formData, setFormData] = useState({
         fecha: Timestamp.now(), sede: 'Sede Central', tipo: 'Clínica', motivo: '', veterinario: '', observaciones: ''
     });
+    const [veterinarios, setVeterinarios] = useState([]);
+    const [insumos, setInsumos] = useState([]);
+    const [usos, setUsos] = useState([{ insumoId: '', cantidad: 1 }]);
+
+    useEffect(() => {
+        const q = query(collection(db, 'veterinarios'), orderBy('nombre'));
+        const unsub = onSnapshot(q, snap => {
+            setVeterinarios(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        });
+        return () => unsub();
+    }, []);
+
+    useEffect(() => {
+        const q = query(collection(db, 'insumos'), orderBy('nombre'));
+        const unsub = onSnapshot(q, snap => {
+            setInsumos(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        });
+        return () => unsub();
+    }, []);
 
     const handleChange = (e) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    const updateUso = (idx, field, value) => {
+        setUsos(usos.map((u,i) => i===idx ? { ...u, [field]: value } : u));
+    };
+    const addUso = () => setUsos([...usos, { insumoId: '', cantidad: 1 }]);
+    const removeUso = (idx) => setUsos(usos.filter((_,i) => i!==idx));
+
+    const calcularEstado = (stock, min) => {
+        if (stock <= 0) return 'Crítico';
+        if (stock <= min) return 'Bajo';
+        return 'OK';
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
             const collectionPath = `vecinos/${vecinoId}/mascotas/${mascotaId}/atenciones`;
-            const docRef = await addDoc(collection(db, collectionPath), formData);
+            const data = { ...formData, insumos: usos.filter(u => u.insumoId) };
+            const docRef = await addDoc(collection(db, collectionPath), data);
             logUserAction(auth.currentUser?.uid, 'registrar atencion', { id: docRef.id, tipo: formData.tipo });
+            for (const uso of data.insumos) {
+                const ins = insumos.find(i => i.id === uso.insumoId);
+                if (ins) {
+                    const nuevoStock = (ins.stock || 0) - Number(uso.cantidad);
+                    const estado = calcularEstado(nuevoStock, ins.min);
+                    await updateDoc(doc(db, 'insumos', ins.id), { stock: nuevoStock, estado });
+                }
+            }
             onBack();
         } catch (error) { console.error("Error al guardar atención: ", error); }
     };
@@ -454,7 +516,25 @@ const AtencionForm = ({ onBack, mascotaId, vecinoId }) => {
                         <div className="form-field"><label>Sede</label><select name="sede" value={formData.sede} onChange={handleChange}><option>Sede Central</option><option>Quirófano Móvil</option></select></div>
                         <div className="form-field"><label>Tipo de Atención</label><select name="tipo" value={formData.tipo} onChange={handleChange}><option>Clínica</option><option>Vacunación</option><option>Castración</option></select></div>
                         <div className="form-field full-width"><label>Motivo / Diagnóstico</label><input name="motivo" value={formData.motivo} onChange={handleChange} required /></div>
-                        <div className="form-field"><label>Veterinario</label><input name="veterinario" value={formData.veterinario} onChange={handleChange} required /></div>
+                        <div className="form-field"><label>Veterinario</label>
+                            <select name="veterinario" value={formData.veterinario} onChange={handleChange} required>
+                                <option value="">Seleccione</option>
+                                {veterinarios.map(v => (<option key={v.id} value={v.nombre}>{v.nombre}</option>))}
+                            </select>
+                        </div>
+                        <div className="form-field full-width"><label>Insumos Utilizados</label>
+                            {usos.map((u,idx) => (
+                                <div key={idx} style={{display:'flex',gap:'0.5rem',marginBottom:'0.5rem'}}>
+                                    <select value={u.insumoId} onChange={e => updateUso(idx,'insumoId', e.target.value)}>
+                                        <option value="">Insumo</option>
+                                        {insumos.map(i => (<option key={i.id} value={i.id}>{i.nombre}</option>))}
+                                    </select>
+                                    <input type="number" min="1" value={u.cantidad} onChange={e => updateUso(idx,'cantidad', e.target.value)} style={{width:'80px'}} />
+                                    <button type="button" className="button button-secondary" onClick={() => removeUso(idx)}>-</button>
+                                </div>
+                            ))}
+                            <button type="button" className="button button-secondary" onClick={addUso}>Agregar Insumo</button>
+                        </div>
                         <div className="form-field full-width"><label>Observaciones y Recomendaciones</label><textarea name="observaciones" value={formData.observaciones} onChange={handleChange} rows="4"></textarea></div>
                     </div>
                     <div className="form-actions">
@@ -732,6 +812,61 @@ const Logs = () => {
     );
 };
 
+const Veterinarios = () => {
+    const [vets, setVets] = useState([]);
+    const [nombre, setNombre] = useState('');
+
+    useEffect(() => {
+        const q = query(collection(db, 'veterinarios'), orderBy('nombre'));
+        const unsub = onSnapshot(q, snap => {
+            setVets(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        });
+        return () => unsub();
+    }, []);
+
+    const handleSubmit = async e => {
+        e.preventDefault();
+        if (!nombre) return;
+        const docRef = await addDoc(collection(db, 'veterinarios'), { nombre });
+        logUserAction(auth.currentUser?.uid, 'crear veterinario', { id: docRef.id });
+        setNombre('');
+    };
+
+    const handleDelete = async id => {
+        await deleteDoc(doc(db, 'veterinarios', id));
+        logUserAction(auth.currentUser?.uid, 'eliminar veterinario', { id });
+    };
+
+    return (
+        <section>
+            <h2 className="section-title">Veterinarios</h2>
+            <div className="card form-container">
+                <form onSubmit={handleSubmit}>
+                    <div className="form-grid">
+                        <div className="form-field full-width"><label>Nombre</label><input value={nombre} onChange={e => setNombre(e.target.value)} required /></div>
+                    </div>
+                    <div className="form-actions">
+                        <button type="submit" className="button button-primary">Agregar</button>
+                    </div>
+                </form>
+            </div>
+            <div className="card" style={{ marginTop: '1rem' }}>
+                <table className="table">
+                    <thead><tr><th>Nombre</th><th></th></tr></thead>
+                    <tbody>
+                        {vets.map(v => (
+                            <tr key={v.id}>
+                                <td>{v.nombre}</td>
+                                <td style={{textAlign:'right'}}><button type="button" className="button button-danger" onClick={() => handleDelete(v.id)}>Eliminar</button></td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    );
+};
+
 const Reportes = () => {
     const [desde, setDesde] = useState('');
     const [hasta, setHasta] = useState('');
@@ -899,6 +1034,7 @@ const App = () => {
             case 'certificado': return <CertificadoVacunacion vecino={selectedVecino} mascota={selectedMascota} onBack={() => setActiveSection('mascotaDetail')} />;
             case 'stock': return <Stock onShowForm={handleShowForm} />;
             case 'insumoForm': return <InsumoForm onBack={() => setActiveSection('stock')} />;
+            case 'veterinarios': return <Veterinarios />;
             case 'usuarios': return <Usuarios />;
             case 'logs': return <Logs />;
             case 'reportes': return <Reportes />;
