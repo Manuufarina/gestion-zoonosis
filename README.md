@@ -23,6 +23,18 @@ Luego edite `.env` y coloque los valores proporcionados por Firebase.
 - Usuario: `mfserra@sanisidro.gob.ar`
 - Contraseña: `si2025`
 
+### Crear usuarios desde un script
+
+Se incluye `scripts/createUser.js` como ejemplo de uso del SDK de Firebase
+Authentication para registrar nuevos usuarios por línea de comandos:
+
+```bash
+node scripts/createUser.js correo@example.com ContraseñaSegura123
+```
+
+Recuerde emplear contraseñas fuertes y que el método de inicio de sesión por
+email y contraseña esté habilitado en la consola de Firebase.
+
 ## Available Scripts
 
 Dentro del directorio del proyecto se puede ejecutar:
