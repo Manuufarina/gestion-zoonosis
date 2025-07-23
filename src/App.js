@@ -4,11 +4,12 @@ import Login from './components/Login';
 
 // --- CONFIGURACIÓN E INICIALIZACIÓN DE FIREBASE ---
 // Se integra directamente para evitar errores de importación.
-import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { onAuthStateChanged, signInWithEmailAndPassword, signOut, getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
+import { initializeApp, getApps } from 'firebase/app';
 import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, Timestamp, collectionGroup, where, getDocs, orderBy, limit, increment } from 'firebase/firestore';
 import { jsPDF } from 'jspdf';
 import { Pie, Bar } from 'react-chartjs-2';
-import { auth, db, storage } from './firebase';
+import { auth, db, storage, firebaseConfig } from './firebase';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import emailjs from '@emailjs/browser';
 import HeaderBand, { LOGO_URL } from './components/HeaderBand';
@@ -455,6 +456,7 @@ const MascotaDetail = ({ mascota, vecino, onBack, onShowForm }) => {
                                 <p><strong>Motivo:</strong> {atencion.motivo}</p>
                                 <p><strong>Veterinario:</strong> {atencion.veterinario}</p>
                                 <p><strong>Observaciones:</strong> {atencion.observaciones}</p>
+                                <button type="button" className="button button-secondary" onClick={() => onShowForm('atencionForm', { mode: 'edit', mascotaId: mascota.id, vecinoId: vecino.id, data: atencion })}>Editar</button>
                             </div>
                         ))}
                     </div>
@@ -464,7 +466,8 @@ const MascotaDetail = ({ mascota, vecino, onBack, onShowForm }) => {
     );
 };
 
-const AtencionForm = ({ onBack, mascotaId, vecinoId }) => {
+const AtencionForm = ({ onBack, mascotaId, vecinoId, currentAtencion }) => {
+    const isEdit = !!currentAtencion;
     const [formData, setFormData] = useState({
         fecha: Timestamp.now(), sede: 'Sede Central', tipo: 'Clínica', motivo: '', veterinario: '', observaciones: ''
     });
@@ -488,6 +491,13 @@ const AtencionForm = ({ onBack, mascotaId, vecinoId }) => {
         return () => unsub();
     }, []);
 
+    useEffect(() => {
+        if (isEdit) {
+            setFormData({ ...currentAtencion });
+            setUsos(currentAtencion.insumos && currentAtencion.insumos.length > 0 ? currentAtencion.insumos : [{ insumoId: '', cantidad: 1 }]);
+        }
+    }, [currentAtencion, isEdit]);
+
     const handleChange = (e) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
     const updateUso = (idx, field, value) => {
         setUsos(usos.map((u,i) => i===idx ? { ...u, [field]: value } : u));
@@ -506,14 +516,19 @@ const AtencionForm = ({ onBack, mascotaId, vecinoId }) => {
         try {
             const collectionPath = `vecinos/${vecinoId}/mascotas/${mascotaId}/atenciones`;
             const data = { ...formData, insumos: usos.filter(u => u.insumoId) };
-            const docRef = await addDoc(collection(db, collectionPath), data);
-            logUserAction(auth.currentUser?.uid, 'registrar atencion', { id: docRef.id, tipo: formData.tipo });
-            for (const uso of data.insumos) {
-                const ins = insumos.find(i => i.id === uso.insumoId);
-                if (ins) {
-                    const nuevoStock = (ins.stock || 0) - Number(uso.cantidad);
-                    const estado = calcularEstado(nuevoStock, ins.min);
-                    await updateDoc(doc(db, 'insumos', ins.id), { stock: nuevoStock, estado });
+            if (isEdit) {
+                await updateDoc(doc(db, collectionPath, currentAtencion.id), data);
+                logUserAction(auth.currentUser?.uid, 'editar atencion', { id: currentAtencion.id });
+            } else {
+                const docRef = await addDoc(collection(db, collectionPath), data);
+                logUserAction(auth.currentUser?.uid, 'registrar atencion', { id: docRef.id, tipo: formData.tipo });
+                for (const uso of data.insumos) {
+                    const ins = insumos.find(i => i.id === uso.insumoId);
+                    if (ins) {
+                        const nuevoStock = (ins.stock || 0) - Number(uso.cantidad);
+                        const estado = calcularEstado(nuevoStock, ins.min);
+                        await updateDoc(doc(db, 'insumos', ins.id), { stock: nuevoStock, estado });
+                    }
                 }
             }
             onBack();
@@ -522,7 +537,7 @@ const AtencionForm = ({ onBack, mascotaId, vecinoId }) => {
 
     return (
         <section>
-            <h2 className="section-title">Registrar Atención</h2>
+            <h2 className="section-title">{isEdit ? 'Editar' : 'Registrar'} Atención</h2>
             <div className="card form-container">
                 <form onSubmit={handleSubmit}>
                     <div className="form-grid">
@@ -602,6 +617,10 @@ const CertificadoVacunacion = ({ vecino, mascota, onBack }) => {
                 y);
             y += 8;
         });
+
+        const previewUrl = doc.output('bloburl');
+        window.open(previewUrl);
+        if (!window.confirm('¿Enviar certificado por email?')) return;
 
         const pdfBlob = doc.output('blob');
         const fileRef = storageRef(storage, `certificados/${mascota.id}_${Date.now()}.pdf`);
@@ -767,8 +786,21 @@ const Usuarios = () => {
     const handleSubmit = async e => {
         e.preventDefault();
         try {
+            const password = Math.random().toString(36).slice(-8);
             const docRef = await addDoc(collection(db, 'usuarios'), formData);
             logUserAction(auth.currentUser?.uid, 'crear usuario', { id: docRef.id });
+
+            try {
+                const apps = getApps();
+                const secondary = apps.find(a => a.name === 'Secondary') || initializeApp(firebaseConfig, 'Secondary');
+                const secondaryAuth = getAuth(secondary);
+                await createUserWithEmailAndPassword(secondaryAuth, formData.email, password);
+                await signOut(secondaryAuth);
+            } catch (err) {
+                console.error('Error creando cuenta de autenticación', err);
+            }
+
+            alert(`Usuario creado. Contraseña: ${password}`);
             setFormData({ nombre: '', email: '', rol: 'Operador', permisos: [] });
         } catch (err) {
             console.error('Error creando usuario', err);
@@ -1067,7 +1099,7 @@ const App = () => {
                 return <MascotaForm onBack={() => setActiveSection(formState.returnTo || 'vecinoDetail')} vecinoId={selectedVecino?.id} currentMascota={formState.mode === 'edit' ? formState.data : null} />;
             case 'mascotaDetail': return <MascotaDetail mascota={selectedMascota} vecino={selectedVecino} onBack={handleBackToVecinoDetail} onShowForm={handleShowForm} />;
             case 'atencionForm':
-                return <AtencionForm onBack={() => setActiveSection(formState.returnTo || 'mascotaDetail')} vecinoId={formState.vecinoId} mascotaId={formState.mascotaId} />;
+                return <AtencionForm onBack={() => setActiveSection(formState.returnTo || 'mascotaDetail')} vecinoId={formState.vecinoId} mascotaId={formState.mascotaId} currentAtencion={formState.mode === 'edit' ? formState.data : null} />;
             case 'certificado': return <CertificadoVacunacion vecino={selectedVecino} mascota={selectedMascota} onBack={() => setActiveSection('mascotaDetail')} />;
             case 'stock': return <Stock onShowForm={handleShowForm} />;
             case 'insumoForm': return <InsumoForm onBack={() => setActiveSection('stock')} />;
