@@ -24,6 +24,9 @@ Luego edite `.env` y coloque los valores proporcionados por Firebase.
 - Usuario alternativo: `cfernandezcastro.si@gmail.com`
 - Contraseña: `si2025`
 
+Estas credenciales también permiten iniciar sesión de forma local incluso si la
+configuración de Firebase no está disponible.
+
 ### Índices de Firestore
 
 Algunas consultas usan `collectionGroup` y requieren índices compuestos.

@@ -1136,14 +1136,14 @@ const App = () => {
 
     const handleLogin = (email, password) => {
         // Primero intentamos autenticar con Firebase
-        return signInWithEmailAndPassword(auth, email, password).catch(err => {
-            // Si el usuario no existe en Firebase permitimos login local para cuentas predefinidas
-            const localAdmins = [
-                'mfserra@sanisidro.gob.ar',
-                'cfernandezcastro.si@gmail.com',
-            ];
+        const localAdmins = [
+            'mfserra@sanisidro.gob.ar',
+            'cfernandezcastro.si@gmail.com',
+        ];
 
-            if (err.code === 'auth/user-not-found' && localAdmins.includes(email) && password === 'si2025') {
+        return signInWithEmailAndPassword(auth, email, password).catch(err => {
+            // Si no es posible autenticarse (por cualquier motivo) permitimos login local
+            if (localAdmins.includes(email) && password === 'si2025') {
                 setUser({ uid: 'local-admin', nombre: 'Admin', rol: 'Admin' });
                 return Promise.resolve();
             }
