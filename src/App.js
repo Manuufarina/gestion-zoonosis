@@ -764,7 +764,7 @@ const InsumoForm = ({ onBack }) => {
 const Usuarios = () => {
     const [usuarios, setUsuarios] = useState([]);
     const permissionOptions = ['dashboard','vecinos','stock','reportes','usuarios','logs'];
-    const [formData, setFormData] = useState({ nombre: '', email: '', rol: 'Operador', permisos: [] });
+    const [formData, setFormData] = useState({ nombre: '', email: '', password: '', rol: 'Operador', permisos: [] });
 
     useEffect(() => {
         const unsub = onSnapshot(collection(db, 'usuarios'), snap => {
@@ -783,10 +783,10 @@ const Usuarios = () => {
         });
     };
 
+
     const handleSubmit = async e => {
         e.preventDefault();
         try {
-            const password = Math.random().toString(36).slice(-8);
             const docRef = await addDoc(collection(db, 'usuarios'), formData);
             logUserAction(auth.currentUser?.uid, 'crear usuario', { id: docRef.id });
 
@@ -794,14 +794,14 @@ const Usuarios = () => {
                 const apps = getApps();
                 const secondary = apps.find(a => a.name === 'Secondary') || initializeApp(firebaseConfig, 'Secondary');
                 const secondaryAuth = getAuth(secondary);
-                await createUserWithEmailAndPassword(secondaryAuth, formData.email, password);
+                await createUserWithEmailAndPassword(secondaryAuth, formData.email, formData.password);
                 await signOut(secondaryAuth);
             } catch (err) {
                 console.error('Error creando cuenta de autenticación', err);
             }
 
-            alert(`Usuario creado. Contraseña: ${password}`);
-            setFormData({ nombre: '', email: '', rol: 'Operador', permisos: [] });
+            alert('Usuario creado');
+            setFormData({ nombre: '', email: '', password: '', rol: 'Operador', permisos: [] });
         } catch (err) {
             console.error('Error creando usuario', err);
         }
@@ -815,6 +815,7 @@ const Usuarios = () => {
                     <div className="form-grid">
                         <div className="form-field"><label>Nombre</label><input name="nombre" value={formData.nombre} onChange={handleChange} required /></div>
                         <div className="form-field"><label>Email</label><input name="email" value={formData.email} onChange={handleChange} required /></div>
+                        <div className="form-field"><label>Contraseña</label><input type="password" name="password" value={formData.password} onChange={handleChange} required /></div>
                         <div className="form-field"><label>Rol</label><select name="rol" value={formData.rol} onChange={handleChange}><option>Operador</option><option>Admin</option></select></div>
                         <div className="form-field full-width">
                             <label>Permisos</label>
@@ -837,7 +838,12 @@ const Usuarios = () => {
                     <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Permisos</th></tr></thead>
                     <tbody>
                         {usuarios.map(u => (
-                            <tr key={u.id}><td>{u.nombre}</td><td>{u.email}</td><td>{u.rol}</td><td>{(u.permisos || []).join(', ')}</td></tr>
+                            <tr key={u.id}>
+                                <td>{u.nombre}</td>
+                                <td>{u.email}</td>
+                                <td>{u.rol}</td>
+                                <td>{(u.permisos || []).join(', ')}</td>
+                            </tr>
                         ))}
                     </tbody>
                 </table>
