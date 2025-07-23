@@ -21,6 +21,7 @@ Luego edite `.env` y coloque los valores proporcionados por Firebase.
 
 ### Usuario administrador
 - Usuario: `mfserra@sanisidro.gob.ar`
+- Usuario alternativo: `cfernandezcastro.si@gmail.com`
 - Contraseña: `si2025`
 
 ### Índices de Firestore
