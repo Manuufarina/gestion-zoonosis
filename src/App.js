@@ -1131,11 +1131,21 @@ const App = () => {
     };
 
     const handleLogin = (email, password) => {
-        if (email === 'mfserra@sanisidro.gob.ar' && password === 'si2025') {
-            setUser({ uid: 'local-admin', nombre: 'Admin', rol: 'Admin' });
-            return Promise.resolve();
-        }
-        return signInWithEmailAndPassword(auth, email, password);
+        // Primero intentamos autenticar con Firebase
+        return signInWithEmailAndPassword(auth, email, password).catch(err => {
+            // Si el usuario no existe en Firebase permitimos login local para cuentas predefinidas
+            const localAdmins = [
+                'mfserra@sanisidro.gob.ar',
+                'cfernandezcastro.si@gmail.com',
+            ];
+
+            if (err.code === 'auth/user-not-found' && localAdmins.includes(email) && password === 'si2025') {
+                setUser({ uid: 'local-admin', nombre: 'Admin', rol: 'Admin' });
+                return Promise.resolve();
+            }
+
+            throw err;
+        });
     };
 
     if (loading) return <div className="loading-screen">Cargando aplicación...</div>;
