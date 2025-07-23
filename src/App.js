@@ -917,14 +917,18 @@ const Logs = () => {
                 <table className="table">
                     <thead><tr><th>Fecha</th><th>Usuario</th><th>Acción</th><th>Detalles</th></tr></thead>
                     <tbody>
-                        {logs.map(l => (
-                            <tr key={l.id}>
-                                <td>{l.fecha ? l.fecha.toDate().toLocaleString() : ''}</td>
-                                <td>{l.uid}</td>
-                                <td>{l.accion}</td>
-                                <td>{JSON.stringify(l.detalles)}</td>
-                            </tr>
-                        ))}
+                        {logs.length === 0 ? (
+                            <tr><td colSpan="4" style={{ textAlign: 'center' }}>No hay movimientos registrados</td></tr>
+                        ) : (
+                            logs.map(l => (
+                                <tr key={l.id}>
+                                    <td>{l.fecha ? l.fecha.toDate().toLocaleString() : ''}</td>
+                                    <td>{l.uid}</td>
+                                    <td>{l.accion}</td>
+                                    <td>{JSON.stringify(l.detalles)}</td>
+                                </tr>
+                            ))
+                        )}
                     </tbody>
                 </table>
             </div>
