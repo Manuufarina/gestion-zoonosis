@@ -4,7 +4,7 @@ import Login from './components/Login';
 
 // --- CONFIGURACIÓN E INICIALIZACIÓN DE FIREBASE ---
 // Se integra directamente para evitar errores de importación.
-import { onAuthStateChanged, signInWithEmailAndPassword, signOut, getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
+import { onAuthStateChanged, signInWithEmailAndPassword, signOut, getAuth, createUserWithEmailAndPassword, updatePassword, deleteUser } from 'firebase/auth';
 import { initializeApp, getApps } from 'firebase/app';
 import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, Timestamp, collectionGroup, where, getDocs, orderBy, limit, increment } from 'firebase/firestore';
 import { jsPDF } from 'jspdf';
@@ -783,27 +783,67 @@ const Usuarios = () => {
         });
     };
 
-
-    const handleSubmit = async e => {
-        e.preventDefault();
+    const handleDeleteUser = async (u) => {
+        if (!window.confirm('¿Eliminar usuario?')) return;
         try {
-            const docRef = await addDoc(collection(db, 'usuarios'), formData);
-            logUserAction(auth.currentUser?.uid, 'crear usuario', { id: docRef.id });
+            await deleteDoc(doc(db, 'usuarios', u.id));
+            logUserAction(auth.currentUser?.uid, 'eliminar usuario', { id: u.id });
 
             try {
                 const apps = getApps();
                 const secondary = apps.find(a => a.name === 'Secondary') || initializeApp(firebaseConfig, 'Secondary');
                 const secondaryAuth = getAuth(secondary);
-                await createUserWithEmailAndPassword(secondaryAuth, formData.email, formData.password);
+                await signInWithEmailAndPassword(secondaryAuth, u.email, u.password);
+                await deleteUser(secondaryAuth.currentUser);
                 await signOut(secondaryAuth);
             } catch (err) {
-                console.error('Error creando cuenta de autenticación', err);
+                console.error('Error eliminando cuenta de autenticación', err);
             }
+        } catch (err) {
+            console.error('Error eliminando usuario', err);
+        }
+    };
+
+    const handleChangePassword = async (u) => {
+        const nueva = prompt('Nueva contraseña para ' + u.email);
+        if (!nueva) return;
+        try {
+            const apps = getApps();
+            const secondary = apps.find(a => a.name === 'Secondary') || initializeApp(firebaseConfig, 'Secondary');
+            const secondaryAuth = getAuth(secondary);
+            await signInWithEmailAndPassword(secondaryAuth, u.email, u.password);
+            await updatePassword(secondaryAuth.currentUser, nueva);
+            await signOut(secondaryAuth);
+            await updateDoc(doc(db, 'usuarios', u.id), { password: nueva });
+            logUserAction(auth.currentUser?.uid, 'cambiar contraseña usuario', { id: u.id });
+            alert('Contraseña actualizada');
+        } catch (err) {
+            console.error('Error cambiando contraseña', err);
+        }
+    };
+
+
+    const handleSubmit = async e => {
+        e.preventDefault();
+        let docRef = null;
+        try {
+            docRef = await addDoc(collection(db, 'usuarios'), formData);
+            logUserAction(auth.currentUser?.uid, 'crear usuario', { id: docRef.id });
+
+            const apps = getApps();
+            const secondary = apps.find(a => a.name === 'Secondary') || initializeApp(firebaseConfig, 'Secondary');
+            const secondaryAuth = getAuth(secondary);
+            await createUserWithEmailAndPassword(secondaryAuth, formData.email, formData.password);
+            await signOut(secondaryAuth);
 
             alert('Usuario creado');
             setFormData({ nombre: '', email: '', password: '', rol: 'Operador', permisos: [] });
         } catch (err) {
             console.error('Error creando usuario', err);
+            if (docRef) {
+                await deleteDoc(doc(db, 'usuarios', docRef.id));
+            }
+            alert('No se pudo crear el usuario');
         }
     };
 
@@ -835,7 +875,7 @@ const Usuarios = () => {
             </div>
             <div className="card" style={{ marginTop: '1rem' }}>
                 <table className="table">
-                    <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Permisos</th></tr></thead>
+                    <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Permisos</th><th></th></tr></thead>
                     <tbody>
                         {usuarios.map(u => (
                             <tr key={u.id}>
@@ -843,6 +883,10 @@ const Usuarios = () => {
                                 <td>{u.email}</td>
                                 <td>{u.rol}</td>
                                 <td>{(u.permisos || []).join(', ')}</td>
+                                <td style={{display:'flex',gap:'0.5rem',justifyContent:'flex-end'}}>
+                                    <button type="button" className="button button-secondary" onClick={() => handleChangePassword(u)}>Contraseña</button>
+                                    <button type="button" className="button button-danger" onClick={() => handleDeleteUser(u)}>Eliminar</button>
+                                </td>
                             </tr>
                         ))}
                     </tbody>
