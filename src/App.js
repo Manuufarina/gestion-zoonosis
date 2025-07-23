@@ -111,19 +111,25 @@ const Dashboard = ({ goToVecinos, goToStock, stats, onNewMascota, onNewAtencion 
             {(datosTipos.length > 0 || datosEspecies.length > 0) && (
                 <div className="kpi-grid" style={{ marginTop: '2rem' }}>
                     {datosTipos.length > 0 && (
-                        <div className="card">
-                            <Bar data={{
-                                labels: datosTipos.map(t => t[0]),
-                                datasets: [{ label: 'Atenciones Mes', data: datosTipos.map(t => t[1]), backgroundColor: '#4ade80' }]
-                            }} />
+                        <div className="card chart-card">
+                            <Bar
+                                data={{
+                                    labels: datosTipos.map(t => t[0]),
+                                    datasets: [{ label: 'Atenciones Mes', data: datosTipos.map(t => t[1]), backgroundColor: '#4ade80' }]
+                                }}
+                                options={{ responsive: true, maintainAspectRatio: false }}
+                            />
                         </div>
                     )}
                     {datosEspecies.length > 0 && (
-                        <div className="card">
-                            <Pie data={{
-                                labels: datosEspecies.map(e => e[0]),
-                                datasets: [{ data: datosEspecies.map(e => e[1]), backgroundColor: ['#60a5fa','#fbbf24'] }]
-                            }} />
+                        <div className="card chart-card">
+                            <Pie
+                                data={{
+                                    labels: datosEspecies.map(e => e[0]),
+                                    datasets: [{ data: datosEspecies.map(e => e[1]), backgroundColor: ['#60a5fa','#fbbf24'] }]
+                                }}
+                                options={{ responsive: true, maintainAspectRatio: false }}
+                            />
                         </div>
                     )}
                 </div>
@@ -991,6 +997,8 @@ const App = () => {
                 .quick-actions { display: flex; gap: 1rem; margin-bottom: 1rem; }
                 .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1rem; }
                 .kpi-card { text-align: center; }
+                .chart-card { width: 100%; height: 200px; }
+                @media (min-width: 768px) { .chart-card { height: 300px; } }
                 /* Detalles */
                 .vecino-detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; }
                 /* Atenciones */
