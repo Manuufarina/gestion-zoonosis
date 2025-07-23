@@ -825,24 +825,25 @@ const Usuarios = () => {
 
     const handleSubmit = async e => {
         e.preventDefault();
+        let docRef = null;
         try {
-            const docRef = await addDoc(collection(db, 'usuarios'), formData);
+            docRef = await addDoc(collection(db, 'usuarios'), formData);
             logUserAction(auth.currentUser?.uid, 'crear usuario', { id: docRef.id });
 
-            try {
-                const apps = getApps();
-                const secondary = apps.find(a => a.name === 'Secondary') || initializeApp(firebaseConfig, 'Secondary');
-                const secondaryAuth = getAuth(secondary);
-                await createUserWithEmailAndPassword(secondaryAuth, formData.email, formData.password);
-                await signOut(secondaryAuth);
-            } catch (err) {
-                console.error('Error creando cuenta de autenticación', err);
-            }
+            const apps = getApps();
+            const secondary = apps.find(a => a.name === 'Secondary') || initializeApp(firebaseConfig, 'Secondary');
+            const secondaryAuth = getAuth(secondary);
+            await createUserWithEmailAndPassword(secondaryAuth, formData.email, formData.password);
+            await signOut(secondaryAuth);
 
             alert('Usuario creado');
             setFormData({ nombre: '', email: '', password: '', rol: 'Operador', permisos: [] });
         } catch (err) {
             console.error('Error creando usuario', err);
+            if (docRef) {
+                await deleteDoc(doc(db, 'usuarios', docRef.id));
+            }
+            alert('No se pudo crear el usuario');
         }
     };
 
