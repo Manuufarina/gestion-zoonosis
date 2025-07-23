@@ -793,7 +793,9 @@ const Usuarios = () => {
                 const apps = getApps();
                 const secondary = apps.find(a => a.name === 'Secondary') || initializeApp(firebaseConfig, 'Secondary');
                 const secondaryAuth = getAuth(secondary);
-                await signInWithEmailAndPassword(secondaryAuth, u.email, u.password);
+                const currentPassword = u.password || prompt('Ingrese la contraseña actual para ' + u.email);
+                if (!currentPassword) throw new Error('missing-password');
+                await signInWithEmailAndPassword(secondaryAuth, u.email, currentPassword);
                 await deleteUser(secondaryAuth.currentUser);
                 await signOut(secondaryAuth);
             } catch (err) {
@@ -811,7 +813,9 @@ const Usuarios = () => {
             const apps = getApps();
             const secondary = apps.find(a => a.name === 'Secondary') || initializeApp(firebaseConfig, 'Secondary');
             const secondaryAuth = getAuth(secondary);
-            await signInWithEmailAndPassword(secondaryAuth, u.email, u.password);
+            const currentPassword = u.password || prompt('Ingrese la contraseña actual para ' + u.email);
+            if (!currentPassword) throw new Error('missing-password');
+            await signInWithEmailAndPassword(secondaryAuth, u.email, currentPassword);
             await updatePassword(secondaryAuth.currentUser, nueva);
             await signOut(secondaryAuth);
             await updateDoc(doc(db, 'usuarios', u.id), { password: nueva });

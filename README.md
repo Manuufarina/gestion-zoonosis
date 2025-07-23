@@ -23,6 +23,19 @@ Luego edite `.env` y coloque los valores proporcionados por Firebase.
 - Usuario: `mfserra@sanisidro.gob.ar`
 - Contraseña: `si2025`
 
+### Índices de Firestore
+
+Algunas consultas usan `collectionGroup` y requieren índices compuestos.
+Si al ejecutar la aplicación ves un error similar a:
+
+```
+FirebaseError: The query requires a COLLECTION_GROUP_ASC index for collection atenciones and field fecha
+```
+
+Ingresa al enlace indicado en el mensaje o crea un índice manualmente desde la
+[consola de Firebase](https://console.firebase.google.com/) para la colección
+`atenciones` ordenada por el campo `fecha`.
+
 ## Available Scripts
 
 Dentro del directorio del proyecto se puede ejecutar:
