@@ -714,7 +714,6 @@ const Stock = ({ onShowForm }) => {
 
 const InsumoForm = ({ onBack }) => {
     const [formData, setFormData] = useState({ nombre: '', stock: 0, min: 0 });
-
     const handleChange = e => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
 
     const calcularEstado = (stock, min) => {
@@ -764,7 +763,9 @@ const InsumoForm = ({ onBack }) => {
 const Usuarios = () => {
     const [usuarios, setUsuarios] = useState([]);
     const permissionOptions = ['dashboard','vecinos','stock','reportes','usuarios','logs'];
-    const [formData, setFormData] = useState({ nombre: '', email: '', rol: 'Operador', permisos: [] });
+    const [formData, setFormData] = useState({ nombre: '', email: '', password: '', rol: 'Operador', permisos: [] });
+    const [editId, setEditId] = useState(null);
+    const isEditMode = !!editId;
 
     useEffect(() => {
         const unsub = onSnapshot(collection(db, 'usuarios'), snap => {
@@ -783,27 +784,32 @@ const Usuarios = () => {
         });
     };
 
+
     const handleSubmit = async e => {
         e.preventDefault();
         try {
-            const password = Math.random().toString(36).slice(-8);
-            const docRef = await addDoc(collection(db, 'usuarios'), formData);
-            logUserAction(auth.currentUser?.uid, 'crear usuario', { id: docRef.id });
+            if (editId) {
+                await updateDoc(doc(db, 'usuarios', editId), formData);
+                logUserAction(auth.currentUser?.uid, 'editar usuario', { id: editId });
+            } else {
+                const docRef = await addDoc(collection(db, 'usuarios'), formData);
+                logUserAction(auth.currentUser?.uid, 'crear usuario', { id: docRef.id });
 
-            try {
-                const apps = getApps();
-                const secondary = apps.find(a => a.name === 'Secondary') || initializeApp(firebaseConfig, 'Secondary');
-                const secondaryAuth = getAuth(secondary);
-                await createUserWithEmailAndPassword(secondaryAuth, formData.email, password);
-                await signOut(secondaryAuth);
-            } catch (err) {
-                console.error('Error creando cuenta de autenticación', err);
+                try {
+                    const apps = getApps();
+                    const secondary = apps.find(a => a.name === 'Secondary') || initializeApp(firebaseConfig, 'Secondary');
+                    const secondaryAuth = getAuth(secondary);
+                    await createUserWithEmailAndPassword(secondaryAuth, formData.email, formData.password);
+                    await signOut(secondaryAuth);
+                } catch (err) {
+                    console.error('Error creando cuenta de autenticación', err);
+                }
+                alert('Usuario creado');
             }
-
-            alert(`Usuario creado. Contraseña: ${password}`);
-            setFormData({ nombre: '', email: '', rol: 'Operador', permisos: [] });
+            setFormData({ nombre: '', email: '', password: '', rol: 'Operador', permisos: [] });
+            setEditId(null);
         } catch (err) {
-            console.error('Error creando usuario', err);
+            console.error('Error guardando usuario', err);
         }
     };
 
@@ -815,6 +821,9 @@ const Usuarios = () => {
                     <div className="form-grid">
                         <div className="form-field"><label>Nombre</label><input name="nombre" value={formData.nombre} onChange={handleChange} required /></div>
                         <div className="form-field"><label>Email</label><input name="email" value={formData.email} onChange={handleChange} required /></div>
+                        {!isEditMode && (
+                            <div className="form-field"><label>Contraseña</label><input type="password" name="password" value={formData.password} onChange={handleChange} required /></div>
+                        )}
                         <div className="form-field"><label>Rol</label><select name="rol" value={formData.rol} onChange={handleChange}><option>Operador</option><option>Admin</option></select></div>
                         <div className="form-field full-width">
                             <label>Permisos</label>
@@ -828,16 +837,25 @@ const Usuarios = () => {
                         </div>
                     </div>
                     <div className="form-actions">
-                        <button type="submit" className="button button-primary">Crear Usuario</button>
+                        {isEditMode && <button type="button" className="button button-secondary" onClick={() => { setFormData({ nombre: '', email: '', password: '', rol: 'Operador', permisos: [] }); setEditId(null); }}>Cancelar</button>}
+                        <button type="submit" className="button button-primary">{isEditMode ? 'Guardar Cambios' : 'Crear Usuario'}</button>
                     </div>
                 </form>
             </div>
             <div className="card" style={{ marginTop: '1rem' }}>
                 <table className="table">
-                    <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Permisos</th></tr></thead>
+                    <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Permisos</th><th></th></tr></thead>
                     <tbody>
                         {usuarios.map(u => (
-                            <tr key={u.id}><td>{u.nombre}</td><td>{u.email}</td><td>{u.rol}</td><td>{(u.permisos || []).join(', ')}</td></tr>
+                            <tr key={u.id}>
+                                <td>{u.nombre}</td>
+                                <td>{u.email}</td>
+                                <td>{u.rol}</td>
+                                <td>{(u.permisos || []).join(', ')}</td>
+                                <td style={{textAlign:'right'}}>
+                                    <button type="button" className="button button-secondary" onClick={() => { setFormData({ nombre: u.nombre, email: u.email, password: '', rol: u.rol, permisos: u.permisos || [] }); setEditId(u.id); }}>Editar</button>
+                                </td>
+                            </tr>
                         ))}
                     </tbody>
                 </table>
