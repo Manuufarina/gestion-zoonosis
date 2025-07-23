@@ -8,11 +8,24 @@ import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebas
 import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, Timestamp, collectionGroup, where, getDocs, orderBy, limit, increment } from 'firebase/firestore';
 import { jsPDF } from 'jspdf';
 import { Pie, Bar } from 'react-chartjs-2';
-import { auth, db } from './firebase';
+import { auth, db, storage } from './firebase';
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import emailjs from '@emailjs/browser';
+import HeaderBand, { LOGO_URL } from './components/HeaderBand';
 import { logUserAction } from './logger';
 import { Chart as ChartJS, ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend } from 'chart.js';
 
 ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend);
+
+const fetchImageData = async (url) => {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    return await new Promise(resolve => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(blob);
+    });
+};
 
 
 // --- COMPONENTES AUXILIARES ---
@@ -563,28 +576,50 @@ const CertificadoVacunacion = ({ vecino, mascota, onBack }) => {
         return () => unsub();
     }, [vecino, mascota]);
 
-    const enviarPDF = () => {
+    const enviarPDF = async () => {
         const doc = new jsPDF();
-        doc.setFillColor(44, 122, 123);
-        doc.rect(0, 0, 210, 20, 'F');
+        const logo = await fetchImageData(LOGO_URL).catch(() => null);
+        doc.setFillColor(20, 83, 45);
+        doc.rect(0, 0, 210, 25, 'F');
+        if (logo) doc.addImage(logo, 'PNG', 10, 3, 20, 20);
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(16);
-        doc.text(CERT_TITLE, 105, 12, { align: 'center' });
+        doc.text(CERT_TITLE, 105, 16, { align: 'center' });
         doc.setTextColor(0, 0, 0);
         doc.setFontSize(12);
-        doc.text(`Dueño: ${vecino.nombre} ${vecino.apellido}`, 20, 30);
-        doc.text(`Domicilio: ${vecino.domicilio}`, 20, 38);
-        doc.text(`Mascota: ${mascota.nombre} - ${mascota.especie} ${mascota.raza}`, 20, 46);
-        doc.text('Vacunas Aplicadas:', 20, 58);
+        let y = 35;
+        doc.text('Datos del Dueño', 20, y); y += 6;
+        doc.text(`Nombre: ${vecino.nombre} ${vecino.apellido}`, 20, y); y += 6;
+        doc.text(`Domicilio: ${vecino.domicilio}`, 20, y); y += 10;
+        doc.text('Datos de la Mascota', 20, y); y += 6;
+        doc.text(`${mascota.nombre} - ${mascota.especie} ${mascota.raza}`, 20, y); y += 10;
+        doc.text('Datos de la Atención de Zoonosis', 20, y); y += 6;
+        doc.text('Vacunas Aplicadas:', 20, y); y += 6;
         vacunas.forEach((v, i) => {
-            const y = 66 + i * 8;
             const fecha = v.fecha.toDate().toLocaleDateString();
             doc.text(`${i + 1}. ${v.motivo} - ${fecha} (${v.sede}) - Vet: ${v.veterinario || ''}`,
                 26,
                 y);
+            y += 8;
         });
-        doc.save('certificado.pdf');
-        alert('Certificado enviado por correo (simulado)');
+
+        const pdfBlob = doc.output('blob');
+        const fileRef = storageRef(storage, `certificados/${mascota.id}_${Date.now()}.pdf`);
+        await uploadBytes(fileRef, pdfBlob);
+        const url = await getDownloadURL(fileRef);
+
+        try {
+            await emailjs.send(
+                process.env.REACT_APP_EMAILJS_SERVICE_ID,
+                process.env.REACT_APP_EMAILJS_TEMPLATE_ID,
+                { to_email: vecino.email, link: url },
+                process.env.REACT_APP_EMAILJS_PUBLIC_KEY
+            );
+            alert('Certificado enviado por correo');
+        } catch (e) {
+            console.error(e);
+            alert('Error al enviar el correo');
+        }
     };
 
     return (
@@ -882,11 +917,13 @@ const Reportes = () => {
         );
         const snap = await getDocs(q);
         const doc = new jsPDF();
-        doc.setFillColor(44, 122, 123);
-        doc.rect(0, 0, 210, 20, 'F');
+        const logo = await fetchImageData(LOGO_URL).catch(() => null);
+        doc.setFillColor(20, 83, 45);
+        doc.rect(0, 0, 210, 25, 'F');
+        if (logo) doc.addImage(logo, 'PNG', 10, 3, 20, 20);
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(16);
-        doc.text('Reporte de Trabajos', 105, 12, { align: 'center' });
+        doc.text('Reporte de Trabajos', 105, 16, { align: 'center' });
         doc.setTextColor(0, 0, 0);
         doc.setFontSize(12);
         let y = 30;
@@ -1166,6 +1203,7 @@ const App = () => {
                     onClose={() => setSidebarOpen(false)}
                 />
                 <main className="main-content">
+                    <HeaderBand />
                     <button className="menu-toggle" onClick={() => setSidebarOpen(!sidebarOpen)}>
                         <i className="fas fa-bars"></i>
                     </button>

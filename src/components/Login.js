@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import HeaderBand from './HeaderBand';
 
 const Login = ({ onLogin }) => {
   const [email, setEmail] = useState('');
@@ -16,6 +17,7 @@ const Login = ({ onLogin }) => {
 
   return (
     <div className="login-container" aria-label="Formulario de inicio de sesión">
+      <HeaderBand />
       <form onSubmit={handleSubmit} className="card form-container">
         <h2>Iniciar Sesión</h2>
         <div className="form-field">
