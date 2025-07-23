@@ -714,8 +714,6 @@ const Stock = ({ onShowForm }) => {
 
 const InsumoForm = ({ onBack }) => {
     const [formData, setFormData] = useState({ nombre: '', stock: 0, min: 0 });
-
-    const isEditMode = !!editId;
     const handleChange = e => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
 
     const calcularEstado = (stock, min) => {
@@ -767,6 +765,7 @@ const Usuarios = () => {
     const permissionOptions = ['dashboard','vecinos','stock','reportes','usuarios','logs'];
     const [formData, setFormData] = useState({ nombre: '', email: '', password: '', rol: 'Operador', permisos: [] });
     const [editId, setEditId] = useState(null);
+    const isEditMode = !!editId;
 
     useEffect(() => {
         const unsub = onSnapshot(collection(db, 'usuarios'), snap => {
