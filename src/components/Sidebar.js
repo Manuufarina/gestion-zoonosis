@@ -21,8 +21,8 @@ const Sidebar = ({ onSelect, activeSection, user, open, onClose }) => {
           <div className="sidebar-section-divider">
             <p className="sidebar-section-title">Administración</p>
             <SidebarLink icon="fa-user-md" text="Veterinarios" section="veterinarios" activeSection={activeSection} onSelect={handleSelect} />
-            <SidebarLink icon="fa-user-shield" text="Gestión de Usuarios" section="usuarios" activeSection={activeSection} onSelect={handleSelect} />
-            <SidebarLink icon="fa-file-alt" text="Logs" section="logs" activeSection={activeSection} onSelect={handleSelect} />
+            {/*<SidebarLink icon="fa-user-shield" text="Gestión de Usuarios" section="usuarios" activeSection={activeSection} onSelect={handleSelect} />*/}
+            {/*<SidebarLink icon="fa-file-alt" text="Logs" section="logs" activeSection={activeSection} onSelect={handleSelect} />*/}
           </div>
         )}
       </nav>

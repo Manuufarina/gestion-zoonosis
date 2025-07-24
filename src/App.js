@@ -684,6 +684,41 @@ const Stock = ({ onShowForm }) => {
         if (estado === 'Crítico') return 'estado-critico';
         return '';
     };
+
+    const calcularEstado = (stock, min) => {
+        if (stock <= 0) return 'Crítico';
+        if (stock <= min) return 'Bajo';
+        return 'OK';
+    };
+
+    const updateStock = async (insumo, nuevoStock) => {
+        if (isNaN(nuevoStock)) return;
+        const stockFinal = Math.max(0, nuevoStock);
+        const estado = calcularEstado(stockFinal, insumo.min);
+        try {
+            await updateDoc(doc(db, 'insumos', insumo.id), { stock: stockFinal, estado });
+            logUserAction(auth.currentUser?.uid, 'actualizar stock', { id: insumo.id, stock: stockFinal });
+        } catch (err) {
+            console.error('Error actualizando stock', err);
+        }
+    };
+
+    const handleEditar = (ins) => {
+        const nuevo = Number(prompt('Nuevo stock para ' + ins.nombre, ins.stock));
+        if (!isNaN(nuevo)) updateStock(ins, nuevo);
+    };
+
+    const handleAgregar = (ins) => {
+        const cant = Number(prompt('Cantidad a agregar', '0'));
+        if (isNaN(cant) || cant === 0) return;
+        updateStock(ins, (ins.stock || 0) + cant);
+    };
+
+    const handleRestar = (ins) => {
+        const cant = Number(prompt('Cantidad a restar', '0'));
+        if (isNaN(cant) || cant === 0) return;
+        updateStock(ins, (ins.stock || 0) - cant);
+    };
     
     return (
         <section>
@@ -695,14 +730,29 @@ const Stock = ({ onShowForm }) => {
             </div>
             <div className="card">
                 <table className="table">
-                    <thead><tr><th>Insumo</th><th style={{textAlign: 'center'}}>Stock Actual</th><th style={{textAlign: 'center'}}>Stock Mínimo</th><th style={{textAlign: 'center'}}>Estado</th></tr></thead>
+                    <thead>
+                        <tr>
+                            <th>Insumo</th>
+                            <th style={{textAlign: 'center'}}>Stock Actual</th>
+                            <th style={{textAlign: 'center'}}>Stock Mínimo</th>
+                            <th style={{textAlign: 'center'}}>Estado</th>
+                            <th></th>
+                        </tr>
+                    </thead>
                     <tbody>
                         {insumos.map(insumo => (
                             <tr key={insumo.id}>
                                 <td>{insumo.nombre}</td>
                                 <td style={{textAlign: 'center'}}>{insumo.stock}</td>
                                 <td style={{textAlign: 'center'}}>{insumo.min}</td>
-                                <td style={{textAlign: 'center'}}><span className={`estado-badge ${getEstadoClass(insumo.estado)}`}>{insumo.estado}</span></td>
+                                <td style={{textAlign: 'center'}}>
+                                    <span className={`estado-badge ${getEstadoClass(insumo.estado)}`}>{insumo.estado}</span>
+                                </td>
+                                <td style={{display:'flex',gap:'0.25rem',justifyContent:'flex-end'}}>
+                                    <button type="button" className="button button-secondary" onClick={() => handleEditar(insumo)}>Editar</button>
+                                    <button type="button" className="button button-secondary" onClick={() => handleAgregar(insumo)}><i className="fas fa-plus"></i></button>
+                                    <button type="button" className="button button-secondary" onClick={() => handleRestar(insumo)}><i className="fas fa-minus"></i></button>
+                                </td>
                             </tr>
                         ))}
                     </tbody>
@@ -763,7 +813,7 @@ const InsumoForm = ({ onBack }) => {
 
 const Usuarios = () => {
     const [usuarios, setUsuarios] = useState([]);
-    const permissionOptions = ['dashboard','vecinos','stock','reportes','usuarios','logs'];
+    const permissionOptions = ['dashboard','vecinos','stock','reportes'];
     const [formData, setFormData] = useState({ nombre: '', email: '', password: '', rol: 'Operador', permisos: [] });
 
     useEffect(() => {
@@ -1171,8 +1221,8 @@ const App = () => {
             case 'stock': return <Stock onShowForm={handleShowForm} />;
             case 'insumoForm': return <InsumoForm onBack={() => setActiveSection('stock')} />;
             case 'veterinarios': return <Veterinarios />;
-            case 'usuarios': return <Usuarios />;
-            case 'logs': return <Logs />;
+            // case 'usuarios': return <Usuarios />;
+            // case 'logs': return <Logs />;
             case 'reportes': return <Reportes />;
             default:
                 return <Dashboard goToVecinos={goToVecinos} goToStock={goToStock} stats={{ vecinos: kpiVecinos, mascotas: kpiMascotas, atenciones: kpiAtenciones }} onNewMascota={handleQuickMascota} onNewAtencion={handleQuickAtencion} />;
